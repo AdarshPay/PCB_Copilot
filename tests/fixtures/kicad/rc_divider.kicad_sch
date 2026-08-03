@@ -1,0 +1,367 @@
+(kicad_sch
+  (version 20250114)
+  (generator "pcb-ai")
+  (generator_version "0.1")
+  (uuid "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeee0001")
+  (paper "A4")
+  (title_block
+    (title "RC voltage divider")
+  )
+  (lib_symbols
+    (symbol "Device:R"
+      (pin_numbers
+        (hide yes)
+      )
+      (pin_names
+        (offset 0)
+      )
+      (exclude_from_sim no)
+      (in_bom yes)
+      (on_board yes)
+      (property "Reference" "R"
+        (at 2.032 0 90)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property "Value" "R"
+        (at 0 0 90)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property "Footprint" ""
+        (at -1.778 0 90)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+          (hide yes)
+        )
+      )
+      (symbol "R_0_1"
+        (rectangle
+          (start -1.016 -2.54)
+          (end 1.016 2.54)
+          (stroke
+            (width 0.254)
+            (type default)
+          )
+          (fill
+            (type none)
+          )
+        )
+      )
+      (symbol "R_1_1"
+        (pin passive line
+          (at 0 3.81 270)
+          (length 1.27)
+          (name "~"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number "1"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+        (pin passive line
+          (at 0 -3.81 90)
+          (length 1.27)
+          (name "~"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number "2"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+      )
+    )
+    (symbol "power:GND"
+      (power)
+      (pin_numbers
+        (hide yes)
+      )
+      (pin_names
+        (offset 0)
+        (hide yes)
+      )
+      (exclude_from_sim no)
+      (in_bom yes)
+      (on_board yes)
+      (property "Reference" "#PWR"
+        (at 0 -6.35 0)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+          (hide yes)
+        )
+      )
+      (property "Value" "GND"
+        (at 0 -3.81 0)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property "Footprint" ""
+        (at 0 0 0)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+          (hide yes)
+        )
+      )
+      (symbol "GND_0_1"
+        (polyline
+          (pts
+            (xy 0 0)
+            (xy 0 -1.27)
+            (xy 1.27 -1.27)
+            (xy 0 -2.54)
+            (xy -1.27 -1.27)
+            (xy 0 -1.27)
+          )
+          (stroke
+            (width 0)
+            (type default)
+          )
+          (fill
+            (type none)
+          )
+        )
+      )
+      (symbol "GND_1_1"
+        (pin power_in line
+          (at 0 0 270)
+          (length 0)
+          (name "GND"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number "1"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+  (symbol
+    (lib_id "Device:R")
+    (at 127 90 0)
+    (unit 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "00000000-0000-4000-8000-000000000001")
+    (property "Reference" "R1"
+      (at 129.54 88.9 0)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+        (justify left)
+      )
+    )
+    (property "Value" "10k"
+      (at 129.54 91.44 0)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+        (justify left)
+      )
+    )
+    (property "Footprint" "Resistor_SMD:R_0603_1608Metric"
+      (at 125.222 90 90)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+        (hide yes)
+      )
+    )
+    (pin "1"
+      (uuid "00000000-0000-4000-8000-000000000011")
+    )
+    (pin "2"
+      (uuid "00000000-0000-4000-8000-000000000012")
+    )
+  )
+  (symbol
+    (lib_id "Device:R")
+    (at 127 70 0)
+    (unit 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "00000000-0000-4000-8000-000000000002")
+    (property "Reference" "R2"
+      (at 129.54 68.9 0)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+        (justify left)
+      )
+    )
+    (property "Value" "10k"
+      (at 129.54 71.44 0)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+        (justify left)
+      )
+    )
+    (property "Footprint" "Resistor_SMD:R_0603_1608Metric"
+      (at 125.222 70 90)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+        (hide yes)
+      )
+    )
+    (pin "1"
+      (uuid "00000000-0000-4000-8000-000000000021")
+    )
+    (pin "2"
+      (uuid "00000000-0000-4000-8000-000000000022")
+    )
+  )
+  (symbol
+    (lib_id "power:GND")
+    (at 127 66.19 0)
+    (unit 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "00000000-0000-4000-8000-000000000003")
+    (property "Reference" "#PWR01"
+      (at 127 59.84 0)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+        (hide yes)
+      )
+    )
+    (property "Value" "GND"
+      (at 127 61.976 0)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property "Footprint" ""
+      (at 127 66.19 0)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+        (hide yes)
+      )
+    )
+    (pin "1"
+      (uuid "00000000-0000-4000-8000-000000000031")
+    )
+  )
+  (global_label "VIN"
+    (shape input)
+    (at 127 93.81 180)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+      (justify right)
+    )
+    (uuid "00000000-0000-4000-8000-0000000000a1")
+  )
+  (label "MID"
+    (at 130 80 0)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+      (justify left bottom)
+    )
+    (uuid "00000000-0000-4000-8000-0000000000a2")
+  )
+  (wire
+    (pts
+      (xy 127 86.19)
+      (xy 127 80)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "00000000-0000-4000-8000-0000000000b1")
+  )
+  (wire
+    (pts
+      (xy 127 80)
+      (xy 127 73.81)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "00000000-0000-4000-8000-0000000000b2")
+  )
+  (wire
+    (pts
+      (xy 127 80)
+      (xy 130 80)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "00000000-0000-4000-8000-0000000000b3")
+  )
+  (junction
+    (at 127 80)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "00000000-0000-4000-8000-0000000000c1")
+  )
+  (sheet_instances
+    (path "/"
+      (page "1")
+    )
+  )
+)

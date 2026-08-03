@@ -1,0 +1,57 @@
+{
+  "$schema": "https://schemas.kicad.org/erc.v1.json",
+  "source": "rc_divider.kicad_sch",
+  "date": "2026-08-02T21:00:00",
+  "kicad_version": "10.0.0",
+  "coordinate_units": "mm",
+  "included_severities": ["error", "warning"],
+  "sheets": [
+    {
+      "path": "/",
+      "uuid_path": "/aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeee0001",
+      "violations": [
+        {
+          "type": "pin_not_connected",
+          "description": "Pin not connected",
+          "severity": "error",
+          "items": [
+            {
+              "uuid": "00000000-0000-4000-8000-000000000011",
+              "description": "R1 Pin 1 [~, Passive, Line]",
+              "pos": { "x": 50.8, "y": 50.8 }
+            }
+          ]
+        },
+        {
+          "type": "label_dangling",
+          "description": "Label not connected to anything",
+          "severity": "warning",
+          "items": [
+            {
+              "uuid": "00000000-0000-4000-8000-0000000000c1",
+              "description": "Local label MID",
+              "pos": { "x": 76.2, "y": 63.5 }
+            }
+          ]
+        },
+        {
+          "type": "pin_to_pin",
+          "description": "Pin connected to other pins, but not driven by any pin",
+          "severity": "error",
+          "items": [
+            {
+              "uuid": "00000000-0000-4000-8000-000000000001",
+              "description": "Symbol R1 Pin 2 [~, Passive, Line]",
+              "pos": { "x": 50.8, "y": 58.42 }
+            },
+            {
+              "uuid": "00000000-0000-4000-8000-000000000002",
+              "description": "Symbol R2 Pin 1 [~, Passive, Line]",
+              "pos": { "x": 76.2, "y": 50.8 }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

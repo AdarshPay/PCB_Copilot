@@ -8,6 +8,7 @@ from pathlib import Path
 from pcb_ai_circuit_ir.models import Design
 
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "golden"
+KICAD_FIXTURES = Path(__file__).resolve().parent / "fixtures" / "kicad"
 
 
 def load_golden(name: str) -> Design:

@@ -4,9 +4,67 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from pcb_ai_circuit_ir.models import Design, ElectricalRole, EvidenceRef, Finding, Severity
+from pcb_ai_circuit_ir.models import (
+    Design,
+    ElectricalRole,
+    EvidenceRef,
+    Finding,
+    Net,
+    NetClass,
+    Severity,
+)
 
 RuleFn = Callable[[Design], list[Finding]]
+
+# Explicit input roles that must be driven for high-precision undriven checks.
+REQUIRED_INPUT_ROLES: frozenset[ElectricalRole] = frozenset(
+    {
+        ElectricalRole.DIGITAL_IN,
+        ElectricalRole.ANALOG_IN,
+        ElectricalRole.RESET,
+        ElectricalRole.ENABLE,
+        ElectricalRole.BOOT,
+        ElectricalRole.CLOCK,
+    }
+)
+
+# Roles that can drive a net for undriven-input purposes.
+NET_DRIVER_ROLES: frozenset[ElectricalRole] = frozenset(
+    {
+        ElectricalRole.DIGITAL_OUT,
+        ElectricalRole.ANALOG_OUT,
+        ElectricalRole.POWER_OUT,
+        ElectricalRole.OPEN_DRAIN,
+        ElectricalRole.DIGITAL_BIDIR,
+        ElectricalRole.GROUND,
+    }
+)
+
+OUTPUT_DRIVER_ROLES: frozenset[ElectricalRole] = frozenset(
+    {
+        ElectricalRole.DIGITAL_OUT,
+        ElectricalRole.ANALOG_OUT,
+        ElectricalRole.POWER_OUT,
+    }
+)
+
+
+def _pin_roles(design: Design) -> dict[tuple[str, str], ElectricalRole]:
+    roles: dict[tuple[str, str], ElectricalRole] = {}
+    for component in design.components:
+        for pin in component.pins:
+            roles[(component.reference, pin.number)] = pin.electrical_role
+    return roles
+
+
+def _net_has_driver(net: Net, pin_roles: dict[tuple[str, str], ElectricalRole]) -> bool:
+    """True if the net is externally supplied or has an active/passive driver pin."""
+    if net.net_class in {NetClass.POWER, NetClass.GROUND}:
+        return True
+    return any(
+        pin_roles.get((ep.component_ref, ep.pin_number)) in NET_DRIVER_ROLES
+        for ep in net.endpoints
+    )
 
 
 def check_parse_schema(design: Design) -> list[Finding]:
@@ -88,18 +146,13 @@ def check_pin_existence(design: Design) -> list[Finding]:
 
 def check_output_conflicts(design: Design) -> list[Finding]:
     """Electrical: two driven outputs on the same net."""
-    pin_roles: dict[tuple[str, str], ElectricalRole] = {}
-    for component in design.components:
-        for pin in component.pins:
-            pin_roles[(component.reference, pin.number)] = pin.electrical_role
-
-    driven = {ElectricalRole.DIGITAL_OUT, ElectricalRole.ANALOG_OUT, ElectricalRole.POWER_OUT}
+    pin_roles = _pin_roles(design)
     findings: list[Finding] = []
     for net in design.nets:
         drivers = [
             ep
             for ep in net.endpoints
-            if pin_roles.get((ep.component_ref, ep.pin_number)) in driven
+            if pin_roles.get((ep.component_ref, ep.pin_number)) in OUTPUT_DRIVER_ROLES
         ]
         if len(drivers) > 1:
             objects = [net.name] + [f"{d.component_ref}.{d.pin_number}" for d in drivers]
@@ -121,14 +174,50 @@ def check_output_conflicts(design: Design) -> list[Finding]:
     return findings
 
 
-def check_power_source(design: Design) -> list[Finding]:
-    """Electrical: power-input pins must attach to a net with a power source."""
-    power_out_nets: set[str] = set()
-    pin_roles: dict[tuple[str, str], ElectricalRole] = {}
+def check_undriven_inputs(design: Design) -> list[Finding]:
+    """Electrical: required input pins must attach to a driven net."""
+    pin_roles = _pin_roles(design)
+    pin_to_nets: dict[tuple[str, str], list[Net]] = {}
+    for net in design.nets:
+        for ep in net.endpoints:
+            pin_to_nets.setdefault((ep.component_ref, ep.pin_number), []).append(net)
+
+    findings: list[Finding] = []
     for component in design.components:
         for pin in component.pins:
-            pin_roles[(component.reference, pin.number)] = pin.electrical_role
+            if pin.electrical_role not in REQUIRED_INPUT_ROLES:
+                continue
+            key = (component.reference, pin.number)
+            nets = pin_to_nets.get(key, [])
+            if not nets or not any(_net_has_driver(net, pin_roles) for net in nets):
+                objects = [f"{component.reference}.{pin.number}"]
+                if nets:
+                    objects.extend(net.name for net in nets)
+                findings.append(
+                    Finding(
+                        rule_id="elec.undriven_input",
+                        severity=Severity.ERROR,
+                        objects=objects,
+                        explanation=(
+                            f"Required input {component.reference}.{pin.number} "
+                            f"({pin.electrical_role.value}) has no driven net."
+                        ),
+                        evidence_refs=[
+                            EvidenceRef(
+                                id="rule:elec.undriven_input",
+                                kind="rule",
+                                title="Undriven required inputs",
+                            )
+                        ],
+                    )
+                )
+    return findings
 
+
+def check_power_source(design: Design) -> list[Finding]:
+    """Electrical: power-input pins must attach to a net with a power source."""
+    pin_roles = _pin_roles(design)
+    power_out_nets: set[str] = set()
     for net in design.nets:
         for ep in net.endpoints:
             if pin_roles.get((ep.component_ref, ep.pin_number)) == ElectricalRole.POWER_OUT:
@@ -140,29 +229,29 @@ def check_power_source(design: Design) -> list[Finding]:
             pin_roles.get((ep.component_ref, ep.pin_number)) == ElectricalRole.POWER_IN
             for ep in net.endpoints
         )
-        if has_power_in and net.name not in power_out_nets and net.net_class.value != "power":
-            # Allow nets explicitly classed as power even without modeled source yet.
-            if not any(
-                pin_roles.get((ep.component_ref, ep.pin_number)) == ElectricalRole.POWER_OUT
-                for ep in net.endpoints
-            ):
-                findings.append(
-                    Finding(
-                        rule_id="elec.power_source",
-                        severity=Severity.WARNING,
-                        objects=[net.name],
-                        explanation=(
-                            f"Power-input net {net.name!r} has no modeled power source."
-                        ),
-                        evidence_refs=[
-                            EvidenceRef(
-                                id="rule:elec.power_source",
-                                kind="rule",
-                                title="Power-input nets without a valid source",
-                            )
-                        ],
-                    )
+        # Allow nets explicitly classed as power even without a modeled source (e.g. board VIN).
+        if (
+            has_power_in
+            and net.name not in power_out_nets
+            and net.net_class != NetClass.POWER
+        ):
+            findings.append(
+                Finding(
+                    rule_id="elec.power_source",
+                    severity=Severity.WARNING,
+                    objects=[net.name],
+                    explanation=(
+                        f"Power-input net {net.name!r} has no modeled power source."
+                    ),
+                    evidence_refs=[
+                        EvidenceRef(
+                            id="rule:elec.power_source",
+                            kind="rule",
+                            title="Power-input nets without a valid source",
+                        )
+                    ],
                 )
+            )
     return findings
 
 
@@ -171,5 +260,6 @@ RULE_PACK_V0: list[tuple[str, RuleFn]] = [
     ("struct.unique_references", check_unique_references),
     ("struct.pin_existence", check_pin_existence),
     ("elec.output_conflict", check_output_conflicts),
+    ("elec.undriven_input", check_undriven_inputs),
     ("elec.power_source", check_power_source),
 ]

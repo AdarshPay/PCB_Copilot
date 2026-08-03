@@ -1,0 +1,64 @@
+"""Mutation tests: one injected fault per rule, plus clean-fixture negatives."""
+
+from __future__ import annotations
+
+import pytest
+
+from pcb_ai_verification import run_rules
+from tests.conftest import load_golden
+from tests.mutation.ir_mutators import (
+    FIRST_PACK_RULE_IDS,
+    mutate_duplicate_reference,
+    mutate_missing_pin,
+    mutate_missing_power_source,
+    mutate_output_conflict,
+    mutate_undriven_input,
+)
+
+CLEAN_GOLDENS = ("rc_divider.json", "i2c_sensor.json")
+
+
+def _first_pack_ids(findings) -> set[str]:
+    return {f.rule_id for f in findings if f.rule_id in FIRST_PACK_RULE_IDS}
+
+
+@pytest.mark.parametrize("name", CLEAN_GOLDENS)
+def test_clean_goldens_have_no_first_pack_findings(name: str) -> None:
+    findings = run_rules(load_golden(name))
+    assert _first_pack_ids(findings) == set()
+
+
+@pytest.mark.parametrize(
+    ("mutator", "expected_rule"),
+    [
+        (mutate_duplicate_reference, "struct.unique_references"),
+        (mutate_missing_pin, "struct.pin_existence"),
+        (mutate_output_conflict, "elec.output_conflict"),
+        (mutate_undriven_input, "elec.undriven_input"),
+        (mutate_missing_power_source, "elec.power_source"),
+    ],
+    ids=[
+        "unique_references",
+        "pin_existence",
+        "output_conflict",
+        "undriven_input",
+        "power_source",
+    ],
+)
+@pytest.mark.parametrize("base", CLEAN_GOLDENS, ids=["rc_divider", "i2c_sensor"])
+def test_single_fault_fires_expected_rule(mutator, expected_rule: str, base: str) -> None:
+    clean = load_golden(base)
+    assert _first_pack_ids(run_rules(clean)) == set()
+
+    mutant = mutator(clean)
+    fired = _first_pack_ids(run_rules(mutant))
+    assert expected_rule in fired
+    # High precision: exactly one first-pack rule for a single injected fault.
+    assert fired == {expected_rule}
+
+
+def test_output_conflict_golden_precision() -> None:
+    """Dedicated conflict fixture should fire output_conflict without other first-pack noise."""
+    findings = run_rules(load_golden("output_conflict.json"))
+    fired = _first_pack_ids(findings)
+    assert fired == {"elec.output_conflict"}

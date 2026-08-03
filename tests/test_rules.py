@@ -2,7 +2,16 @@
 
 from __future__ import annotations
 
-from pcb_ai_verification import run_rules
+from pcb_ai_circuit_ir.models import (
+    Component,
+    ElectricalRole,
+    Endpoint,
+    FunctionalClass,
+    Net,
+    NetClass,
+    Pin,
+)
+from pcb_ai_verification import RULE_PACK_V0, run_rules
 from tests.conftest import load_golden
 
 
@@ -32,3 +41,49 @@ def test_duplicate_reference_detected() -> None:
     design.components[1].reference = design.components[0].reference
     findings = run_rules(design)
     assert any(f.rule_id == "struct.unique_references" for f in findings)
+
+
+def test_rule_pack_includes_first_five_checks() -> None:
+    ids = {rule_id for rule_id, _ in RULE_PACK_V0}
+    assert ids >= {
+        "struct.unique_references",
+        "struct.pin_existence",
+        "elec.output_conflict",
+        "elec.undriven_input",
+        "elec.power_source",
+    }
+
+
+def test_undriven_input_detected() -> None:
+    design = load_golden("rc_divider.json")
+    design.components.append(
+        Component(
+            reference="U9",
+            value="SENSOR",
+            functional_class=FunctionalClass.SENSOR,
+            pins=[Pin(number="1", name="RESET", electrical_role=ElectricalRole.RESET)],
+        )
+    )
+    findings = run_rules(design)
+    assert any(f.rule_id == "elec.undriven_input" for f in findings)
+
+
+def test_power_source_warning_on_signal_net() -> None:
+    design = load_golden("rc_divider.json")
+    design.components.append(
+        Component(
+            reference="U8",
+            value="LOAD",
+            functional_class=FunctionalClass.OTHER,
+            pins=[Pin(number="1", name="VDD", electrical_role=ElectricalRole.POWER_IN)],
+        )
+    )
+    design.nets.append(
+        Net(
+            name="FLOAT_VDD",
+            net_class=NetClass.SIGNAL,
+            endpoints=[Endpoint(component_ref="U8", pin_number="1")],
+        )
+    )
+    findings = run_rules(design)
+    assert any(f.rule_id == "elec.power_source" for f in findings)

@@ -4,11 +4,15 @@ Verification-first KiCad copilot for schematic review and bounded schematic gene
 
 The circuit IR is the source of truth. Deterministic tools own syntax, graph integrity, and rule compliance. The LLM may propose typed operations but never mutates production CAD files directly. Human approval is required for electrical changes.
 
-## Current milestone (Sprint days 1–2)
+## Current milestone (Sprint days 6–7)
 
-- Monorepo and local Docker environment
-- Circuit IR, Finding, Evidence, and Operation schemas
-- Golden JSON fixtures for three tiny circuits
+- Containerized KiCad CLI image under `infra/docker/kicad-cli/`
+- Parse `kicad-cli sch erc` JSON/text reports into normalized `Finding` objects
+- Map ERC items back to schematic component UUIDs / references when possible
+- Worker job type `run_erc` (Redis queue); offline fixture path so pytest needs no Docker
+- Prior (days 3–5): lossless `.kicad_sch` parse/normalize/round-trip, CLI ingest, `POST /v1/ingest/schematic`
+
+Next (days 8–9): expand first deterministic rules + mutation tests per fault class.
 
 Sprint exit criterion: ingest, normalize, check, round-trip, and report one real KiCad schematic **without** an LLM.
 
@@ -62,6 +66,18 @@ pytest
 # Export JSON Schema documents
 python scripts/export_schemas.py
 ```
+
+### Native ERC (optional Docker)
+
+Pytest uses `tests/fixtures/kicad/rc_divider_erc.json` and does not require KiCad. To run live ERC when Docker is available:
+
+```powershell
+docker build -t pcb-ai-kicad-cli:local -f infra/docker/kicad-cli/Dockerfile infra/docker/kicad-cli
+docker run --rm -v ${PWD}/tests/fixtures/kicad:/work -w /work pcb-ai-kicad-cli:local `
+  sch erc --format json --severity-all --output rc_divider_erc_live.json rc_divider.kicad_sch
+```
+
+See `infra/docker/kicad-cli/README.md` for worker payload examples (`type: run_erc`).
 
 ## Design constraints
 
