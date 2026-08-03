@@ -1,0 +1,16 @@
+[project]
+name = "pcb-ai-verification"
+version = "0.1.0"
+description = "Deterministic schematic verification rule engine"
+requires-python = ">=3.12"
+dependencies = [
+  "pcb-ai-circuit-ir",
+  "networkx>=3.4",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

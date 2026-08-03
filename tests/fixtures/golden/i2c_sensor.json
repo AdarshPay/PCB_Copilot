@@ -1,0 +1,297 @@
+{
+  "id": "fixture.i2c_sensor",
+  "source_tool": "synthetic",
+  "source_version": "fixture-0.1",
+  "revision": "1",
+  "name": "MCU plus I2C temperature sensor",
+  "requirements": [
+    {
+      "id": "req.i2c_bus",
+      "text": "Sensor connects to MCU over I2C with pull-ups to 3V3.",
+      "priority": "must"
+    }
+  ],
+  "blocks": [
+    {
+      "id": "blk.mcu",
+      "name": "MCU",
+      "component_refs": ["U1"]
+    },
+    {
+      "id": "blk.sensor",
+      "name": "Sensor",
+      "component_refs": ["U2", "R3", "R4"]
+    }
+  ],
+  "components": [
+    {
+      "reference": "U1",
+      "manufacturer_part_number": "RP2040",
+      "value": "RP2040",
+      "functional_class": "mcu",
+      "symbol_ref": "MCU_RaspberryPi:RP2040",
+      "footprint_ref": "Package_DFN_QFN:QFN-56-1EP_7x7mm_P0.4mm",
+      "pins": [
+        {
+          "number": "1",
+          "name": "GPIO0",
+          "electrical_role": "open_drain",
+          "interface_role": "i2c_sda",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "2",
+          "name": "GPIO1",
+          "electrical_role": "open_drain",
+          "interface_role": "i2c_scl",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "3",
+          "name": "VDD",
+          "electrical_role": "power_in",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "4",
+          "name": "GND",
+          "electrical_role": "ground",
+          "voltage_domain": "GND"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000011"
+    },
+    {
+      "reference": "U2",
+      "manufacturer_part_number": "TMP117",
+      "value": "TMP117",
+      "functional_class": "sensor",
+      "symbol_ref": "Sensor_Temperature:TMP117",
+      "footprint_ref": "Package_TO_SOT_SMD:SOT-563",
+      "pins": [
+        {
+          "number": "1",
+          "name": "SDA",
+          "electrical_role": "open_drain",
+          "interface_role": "i2c_sda",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "2",
+          "name": "SCL",
+          "electrical_role": "open_drain",
+          "interface_role": "i2c_scl",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "3",
+          "name": "V+",
+          "electrical_role": "power_in",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "4",
+          "name": "GND",
+          "electrical_role": "ground",
+          "voltage_domain": "GND"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000012"
+    },
+    {
+      "reference": "R3",
+      "value": "4.7k",
+      "functional_class": "passive",
+      "symbol_ref": "Device:R",
+      "footprint_ref": "Resistor_SMD:R_0603_1608Metric",
+      "pins": [
+        {
+          "number": "1",
+          "name": "1",
+          "electrical_role": "passive"
+        },
+        {
+          "number": "2",
+          "name": "2",
+          "electrical_role": "passive"
+        }
+      ],
+      "attributes": {
+        "role": "i2c_pullup_sda"
+      },
+      "uuid": "00000000-0000-4000-8000-000000000013"
+    },
+    {
+      "reference": "R4",
+      "value": "4.7k",
+      "functional_class": "passive",
+      "symbol_ref": "Device:R",
+      "footprint_ref": "Resistor_SMD:R_0603_1608Metric",
+      "pins": [
+        {
+          "number": "1",
+          "name": "1",
+          "electrical_role": "passive"
+        },
+        {
+          "number": "2",
+          "name": "2",
+          "electrical_role": "passive"
+        }
+      ],
+      "attributes": {
+        "role": "i2c_pullup_scl"
+      },
+      "uuid": "00000000-0000-4000-8000-000000000014"
+    },
+    {
+      "reference": "U3",
+      "manufacturer_part_number": "AP2112K-3.3",
+      "value": "3.3V",
+      "functional_class": "regulator_ldo",
+      "symbol_ref": "Regulator_Linear:AP2112K-3.3",
+      "footprint_ref": "Package_TO_SOT_SMD:SOT-23-5",
+      "pins": [
+        {
+          "number": "1",
+          "name": "VIN",
+          "electrical_role": "power_in",
+          "voltage_domain": "5V"
+        },
+        {
+          "number": "2",
+          "name": "GND",
+          "electrical_role": "ground",
+          "voltage_domain": "GND"
+        },
+        {
+          "number": "3",
+          "name": "VOUT",
+          "electrical_role": "power_out",
+          "voltage_domain": "3V3"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000015"
+    }
+  ],
+  "nets": [
+    {
+      "name": "3V3",
+      "class": "power",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U3",
+          "pin_number": "3"
+        },
+        {
+          "component_ref": "U1",
+          "pin_number": "3"
+        },
+        {
+          "component_ref": "U2",
+          "pin_number": "3"
+        },
+        {
+          "component_ref": "R3",
+          "pin_number": "1"
+        },
+        {
+          "component_ref": "R4",
+          "pin_number": "1"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000b1"
+    },
+    {
+      "name": "GND",
+      "class": "ground",
+      "voltage_domain": "GND",
+      "endpoints": [
+        {
+          "component_ref": "U3",
+          "pin_number": "2"
+        },
+        {
+          "component_ref": "U1",
+          "pin_number": "4"
+        },
+        {
+          "component_ref": "U2",
+          "pin_number": "4"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000b2"
+    },
+    {
+      "name": "I2C_SDA",
+      "class": "bus",
+      "protocol": "i2c",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "1"
+        },
+        {
+          "component_ref": "U2",
+          "pin_number": "1"
+        },
+        {
+          "component_ref": "R3",
+          "pin_number": "2"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000b3"
+    },
+    {
+      "name": "I2C_SCL",
+      "class": "bus",
+      "protocol": "i2c",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "2"
+        },
+        {
+          "component_ref": "U2",
+          "pin_number": "2"
+        },
+        {
+          "component_ref": "R4",
+          "pin_number": "2"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000b4"
+    },
+    {
+      "name": "VIN_5V",
+      "class": "power",
+      "voltage_domain": "5V",
+      "endpoints": [
+        {
+          "component_ref": "U3",
+          "pin_number": "1"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000b5"
+    }
+  ],
+  "assertions": [
+    {
+      "id": "assert.i2c_pullups",
+      "kind": "interface",
+      "expression": "I2C_SDA and I2C_SCL have pull-ups to 3V3",
+      "severity": "error"
+    }
+  ],
+  "evidence_refs": [
+    {
+      "id": "fixture:i2c_sensor",
+      "kind": "fixture",
+      "title": "Golden MCU + I2C sensor",
+      "confidence": 1.0
+    }
+  ]
+}

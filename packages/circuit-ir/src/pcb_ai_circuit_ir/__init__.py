@@ -1,0 +1,43 @@
+"""Typed circuit intermediate representation (Circuit IR v0)."""
+
+from pcb_ai_circuit_ir.models import (
+    Assertion,
+    Block,
+    Component,
+    Constraint,
+    Design,
+    ElectricalRole,
+    Endpoint,
+    EvidenceRef,
+    Finding,
+    FunctionalClass,
+    Net,
+    NetClass,
+    Operation,
+    Pin,
+    Requirement,
+    RiskTier,
+    Severity,
+    SourceLocation,
+)
+
+__all__ = [
+    "Assertion",
+    "Block",
+    "Component",
+    "Constraint",
+    "Design",
+    "ElectricalRole",
+    "Endpoint",
+    "EvidenceRef",
+    "Finding",
+    "FunctionalClass",
+    "Net",
+    "NetClass",
+    "Operation",
+    "Pin",
+    "Requirement",
+    "RiskTier",
+    "Severity",
+    "SourceLocation",
+]

@@ -1,0 +1,21 @@
+[project]
+name = "pcb-ai-worker"
+version = "0.1.0"
+description = "Background worker for ERC, parsing, retrieval, and simulation jobs"
+requires-python = ">=3.12"
+dependencies = [
+  "redis>=5.2",
+  "pcb-ai-circuit-ir",
+  "pcb-ai-verification",
+  "pcb-ai-kicad-adapter",
+]
+
+[project.scripts]
+pcb-ai-worker = "pcb_ai_worker.main:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,113 @@
+{
+  "id": "fixture.rc_divider",
+  "source_tool": "synthetic",
+  "source_version": "fixture-0.1",
+  "revision": "1",
+  "name": "RC voltage divider",
+  "requirements": [
+    {
+      "id": "req.passive_divider",
+      "text": "Two series resistors form a voltage divider from VIN to GND.",
+      "priority": "must"
+    }
+  ],
+  "blocks": [
+    {
+      "id": "blk.divider",
+      "name": "Divider",
+      "component_refs": ["R1", "R2"]
+    }
+  ],
+  "components": [
+    {
+      "reference": "R1",
+      "value": "10k",
+      "functional_class": "passive",
+      "symbol_ref": "Device:R",
+      "footprint_ref": "Resistor_SMD:R_0603_1608Metric",
+      "pins": [
+        {
+          "number": "1",
+          "name": "1",
+          "electrical_role": "passive"
+        },
+        {
+          "number": "2",
+          "name": "2",
+          "electrical_role": "passive"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000001"
+    },
+    {
+      "reference": "R2",
+      "value": "10k",
+      "functional_class": "passive",
+      "symbol_ref": "Device:R",
+      "footprint_ref": "Resistor_SMD:R_0603_1608Metric",
+      "pins": [
+        {
+          "number": "1",
+          "name": "1",
+          "electrical_role": "passive"
+        },
+        {
+          "number": "2",
+          "name": "2",
+          "electrical_role": "passive"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000002"
+    }
+  ],
+  "nets": [
+    {
+      "name": "VIN",
+      "class": "power",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "R1",
+          "pin_number": "1"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000a1"
+    },
+    {
+      "name": "MID",
+      "class": "signal",
+      "endpoints": [
+        {
+          "component_ref": "R1",
+          "pin_number": "2"
+        },
+        {
+          "component_ref": "R2",
+          "pin_number": "1"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000a2"
+    },
+    {
+      "name": "GND",
+      "class": "ground",
+      "voltage_domain": "GND",
+      "endpoints": [
+        {
+          "component_ref": "R2",
+          "pin_number": "2"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000a3"
+    }
+  ],
+  "assertions": [],
+  "evidence_refs": [
+    {
+      "id": "fixture:rc_divider",
+      "kind": "fixture",
+      "title": "Golden RC divider",
+      "confidence": 1.0
+    }
+  ]
+}

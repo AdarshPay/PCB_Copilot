@@ -1,0 +1,15 @@
+[project]
+name = "pcb-ai-circuit-ir"
+version = "0.1.0"
+description = "Typed canonical circuit intermediate representation"
+requires-python = ">=3.12"
+dependencies = [
+  "pydantic>=2.10",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

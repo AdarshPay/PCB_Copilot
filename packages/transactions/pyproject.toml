@@ -1,0 +1,15 @@
+[project]
+name = "pcb-ai-transactions"
+version = "0.1.0"
+description = "Typed edit operations, semantic diff, and rollback"
+requires-python = ">=3.12"
+dependencies = [
+  "pcb-ai-circuit-ir",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

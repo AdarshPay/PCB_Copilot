@@ -1,0 +1,164 @@
+{
+  "id": "fixture.output_conflict",
+  "source_tool": "synthetic",
+  "source_version": "fixture-0.1",
+  "revision": "1",
+  "name": "Injected output-to-output fault",
+  "requirements": [
+    {
+      "id": "req.no_bus_fight",
+      "text": "Two GPIO outputs must not drive the same net.",
+      "priority": "must"
+    }
+  ],
+  "blocks": [],
+  "components": [
+    {
+      "reference": "U1",
+      "value": "MCU_A",
+      "functional_class": "mcu",
+      "symbol_ref": "MCU:Generic",
+      "pins": [
+        {
+          "number": "1",
+          "name": "GPIO0",
+          "electrical_role": "digital_out",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "2",
+          "name": "VDD",
+          "electrical_role": "power_in",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "3",
+          "name": "GND",
+          "electrical_role": "ground",
+          "voltage_domain": "GND"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000021"
+    },
+    {
+      "reference": "U2",
+      "value": "MCU_B",
+      "functional_class": "mcu",
+      "symbol_ref": "MCU:Generic",
+      "pins": [
+        {
+          "number": "1",
+          "name": "GPIO0",
+          "electrical_role": "digital_out",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "2",
+          "name": "VDD",
+          "electrical_role": "power_in",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "3",
+          "name": "GND",
+          "electrical_role": "ground",
+          "voltage_domain": "GND"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000022"
+    },
+    {
+      "reference": "U3",
+      "value": "3.3V",
+      "functional_class": "regulator_ldo",
+      "symbol_ref": "Regulator_Linear:Generic",
+      "pins": [
+        {
+          "number": "1",
+          "name": "VIN",
+          "electrical_role": "power_in",
+          "voltage_domain": "5V"
+        },
+        {
+          "number": "2",
+          "name": "GND",
+          "electrical_role": "ground",
+          "voltage_domain": "GND"
+        },
+        {
+          "number": "3",
+          "name": "VOUT",
+          "electrical_role": "power_out",
+          "voltage_domain": "3V3"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000023"
+    }
+  ],
+  "nets": [
+    {
+      "name": "NET_FIGHT",
+      "class": "signal",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "1"
+        },
+        {
+          "component_ref": "U2",
+          "pin_number": "1"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000c1"
+    },
+    {
+      "name": "3V3",
+      "class": "power",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U3",
+          "pin_number": "3"
+        },
+        {
+          "component_ref": "U1",
+          "pin_number": "2"
+        },
+        {
+          "component_ref": "U2",
+          "pin_number": "2"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000c2"
+    },
+    {
+      "name": "GND",
+      "class": "ground",
+      "voltage_domain": "GND",
+      "endpoints": [
+        {
+          "component_ref": "U3",
+          "pin_number": "2"
+        },
+        {
+          "component_ref": "U1",
+          "pin_number": "3"
+        },
+        {
+          "component_ref": "U2",
+          "pin_number": "3"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000c3"
+    }
+  ],
+  "assertions": [],
+  "evidence_refs": [
+    {
+      "id": "fixture:output_conflict",
+      "kind": "fixture",
+      "title": "Golden injected output conflict",
+      "confidence": 1.0
+    }
+  ]
+}
