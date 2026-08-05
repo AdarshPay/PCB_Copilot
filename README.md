@@ -4,12 +4,13 @@ Verification-first KiCad copilot for schematic review and bounded schematic gene
 
 The circuit IR is the source of truth. Deterministic tools own syntax, graph integrity, and rule compliance. The LLM may propose typed operations but never mutates production CAD files directly. Human approval is required for electrical changes.
 
-## Current milestone (Sprint day 10)
+## Current milestone (Sprint day 10+)
 
 - Machine-readable `ReviewReport` with findings, net fragments, and summary
 - HTML semantic review report (`POST /v1/reviews/html`, CLI `--html`)
 - Reproducible first-pack benchmark run manifest (`python -m pcb_ai_benchmarks`)
-- Prior: KiCad ingest/round-trip, ERC normalization, first five deterministic rules + mutations
+- Offline CI hardware check (`python -m pcb_ai_benchmarks.ci_check`) + GitHub Actions
+- Prior: KiCad ingest/round-trip, ERC normalization, first-pack deterministic rules + mutations
 
 Sprint exit criterion: ingest, normalize, check, round-trip, and report one real KiCad schematic **without** an LLM.
 
@@ -68,6 +69,9 @@ python -m pcb_ai_kicad_adapter tests/fixtures/kicad/rc_divider.kicad_sch --repor
 
 # First-pack mutation benchmark manifest
 python -m pcb_ai_benchmarks -o reports/run-manifest.json
+
+# CI hardware check (ingest + RULE_PACK_V0 + offline ERC fixture; no Docker KiCad)
+python -m pcb_ai_benchmarks.ci_check -o reports/ci-hardware-check.json
 ```
 
 ### Native ERC (optional Docker)

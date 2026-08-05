@@ -18,10 +18,12 @@ Verification-first KiCad schematic copilot: ingest a schematic → typed Circuit
 | 6–7 Native ERC | Done | ERC→Finding, Docker image, offline tests |
 | 8–9 First rules + mutations | Done | Five first-pack rules + single-fault mutations |
 | 10 Review artifact | Done (local; push with this handoff) | JSON + HTML report, run manifest |
+| Day 30 rules (partial) | In progress | +3 electrical rules (pull-up, voltage domain, polarity); 9 total in RULE_PACK_V0 |
+| Day 30 CI command | Done | Offline ingest + rules + ERC fixture; `.github/workflows/ci.yml` |
 
 **Sprint exit criterion (met):** one schematic can be ingested, normalized, checked, round-tripped, and reported **without an LLM**.
 
-**Next horizon:** Day 30 goals in the plan (10 checks, more fixtures/mutations, CI hardware-check command). Do **not** jump to layout/routing or broad LLM generation.
+**Next horizon:** Day 30 goals in the plan (10 checks, more fixtures/mutations; CI hardware-check command is done). Do **not** jump to layout/routing or broad LLM generation.
 
 ## Architecture (source of truth)
 
@@ -52,7 +54,7 @@ packages/circuit-ir/      Design, Component, Pin, Net, Finding, Operation, Revie
 packages/kicad-adapter/   parser, connectivity, normalize, emit, semantic, CLI (__main__)
 packages/verification/    RULE_PACK_V0, ERC parse/runner, build_review_report, HTML renderer
 packages/transactions/    apply_operations, semantic_diff (prototype)
-packages/benchmarks/      first-pack mutation benchmark + RunManifest
+packages/benchmarks/      first-pack mutation benchmark + RunManifest + CI hardware check
 packages/evidence|agent|simulation|component-library/  stubs / early models
 services/worker/          Redis jobs: verify_design, run_erc
 infra/local-compose.yml   Postgres(pgvector), Redis, MinIO
@@ -82,6 +84,9 @@ Pydantic v2 models in `packages/circuit-ir`. Nets are hyperedges (multi-pin). Ex
 - `elec.output_conflict`
 - `elec.undriven_input` (digital_in, analog_in, reset, enable, boot, clock)
 - `elec.power_source` (power-class nets exempt as board VIN)
+- `elec.open_drain_pullup` (open_drain endpoints or protocol=i2c need passive→power pull-up)
+- `elec.voltage_domain` (explicit pin/net voltage_domain strings must agree on a net)
+- `elec.polarity` (opt-in `attributes.polarized` + positive/negative pins; flags +on-GND/−on-power)
 
 ### ERC
 - Parse KiCad ERC JSON + classic `.rpt` → `Finding` (`source=kicad_erc`)
@@ -93,7 +98,8 @@ Pydantic v2 models in `packages/circuit-ir`. Nets are hyperedges (multi-pin). Ex
 - `build_review_report()` → findings, summary, net fragments (current or before/after)
 - `render_html_report()` → self-contained HTML
 - API: `POST /v1/reviews`, `POST /v1/reviews/html`
-- Benchmark: `python -m pcb_ai_benchmarks -o reports/run-manifest.json` (13/13 first-pack cases)
+- Benchmark: `python -m pcb_ai_benchmarks -o reports/run-manifest.json` (19 cases: 2 clean × 8 mutations + conflict fixture)
+- CI hardware check: `python -m pcb_ai_benchmarks.ci_check` (offline ERC fixture; no Docker KiCad)
 
 ## How to run locally
 
@@ -116,7 +122,10 @@ Smoke review:
 ```powershell
 python -m pcb_ai_kicad_adapter tests/fixtures/kicad/rc_divider.kicad_sch --report --html reports/rc_divider.html -o reports/rc_divider.json
 python -m pcb_ai_benchmarks -o reports/run-manifest.json
+python -m pcb_ai_benchmarks.ci_check -o reports/ci-hardware-check.json
 ```
+
+CI hardware check (`python -m pcb_ai_benchmarks.ci_check` / `pcb-ai-ci-check`): ingest sample schematic → RULE_PACK_V0 → optional offline ERC fixture. Exit `0` if rules have no `error`/`critical` findings and ERC parse succeeds; `1` on unexpected blocking rule findings or ERC runner failure; `2` on missing inputs / ingest errors. Intentional ERC fixture findings are recorded but do not fail the job. GitHub Actions: `.github/workflows/ci.yml`.
 
 Notes:
 - Windows shell needs unrestricted permissions in Cursor if sandbox is unavailable.
@@ -125,10 +134,10 @@ Notes:
 
 ## Tests
 
-Expect **53 passed** after Day 10 (`pytest`). Key suites:
+Expect **68 passed** after Day 30 rule expansions (`pytest`). Key suites:
 - `tests/test_golden_fixtures.py`, `test_rules.py`, `test_mutation_rules.py`
 - `tests/test_parser.py`, `test_roundtrip_kicad.py`
-- `tests/test_erc.py`, `test_report.py`, `test_benchmark_manifest.py`, `test_api.py`
+- `tests/test_erc.py`, `test_report.py`, `test_benchmark_manifest.py`, `test_ci_hardware_check.py`, `test_api.py`
 
 ## Explicitly not built yet
 
@@ -139,16 +148,17 @@ Expect **53 passed** after Day 10 (`pytest`). Key suites:
 - ngspice simulation jobs
 - Altium support, placement/routing
 - Live ERC in CI (image exists; unit tests are fixture-based)
-- Expanding beyond ~5–6 high-precision rules to the full §7 pack
+- Expanding beyond ~9 high-precision rules to the full §7 pack
 
 ## Recommended next work (Day 30 track)
 
 Prioritize in order:
-1. **More deterministic rules** from plan §7 (pull-ups, polarity, regulator constraints, etc.) with one mutation test each — keep high precision; avoid noisy AI findings.
+1. **More deterministic rules** from remaining plan §7 checks (e.g. footprint existence, duplicate net labels, regulator constraints, reset/enable if distinct from `elec.undriven_input`) — `elec.open_drain_pullup`, `elec.voltage_domain`, and `elec.polarity` already landed; one mutation test each; keep high precision; avoid noisy AI findings.
 2. **More clean KiCad projects + mutations** toward 10 clean / 100 mutations; keep project-family splits in mind.
-3. **CI command** that runs ingest + rules (+ offline ERC fixture path) on a sample project.
-4. Harden KiCad normalize for hierarchy / multi-sheet / real libraries (round-trip UUID/hierarchy research item).
-5. Only after precision is solid: component profiles, then evidence retrieval, then typed LLM remediations (Day 60).
+3. Harden KiCad normalize for hierarchy / multi-sheet / real libraries (round-trip UUID/hierarchy research item).
+4. Only after precision is solid: component profiles, then evidence retrieval, then typed LLM remediations (Day 60).
+
+(CI hardware-check is done — see sprint table / `ci_check` + `.github/workflows/ci.yml`.)
 
 ## Guardrails for the next agent
 
@@ -171,4 +181,5 @@ Prioritize in order:
 | ERC | `packages/verification/src/pcb_ai_verification/erc_*.py` |
 | Mutations | `tests/mutation/ir_mutators.py` |
 | Benchmark manifest | `packages/benchmarks/src/pcb_ai_benchmarks/manifest.py` |
+| CI hardware check | `packages/benchmarks/src/pcb_ai_benchmarks/ci_check.py` |
 | API | `apps/api/src/pcb_ai_api/` |

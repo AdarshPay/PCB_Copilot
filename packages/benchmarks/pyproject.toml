@@ -5,12 +5,14 @@ description = "Benchmark datasets, mutation engine, and scoring"
 requires-python = ">=3.12"
 dependencies = [
   "pcb-ai-circuit-ir",
+  "pcb-ai-kicad-adapter",
   "pcb-ai-verification",
   "pydantic>=2.10",
 ]
 
 [project.scripts]
 pcb-ai-benchmark = "pcb_ai_benchmarks.__main__:main"
+pcb-ai-ci-check = "pcb_ai_benchmarks.ci_check:main"
 
 [build-system]
 requires = ["setuptools>=68"]

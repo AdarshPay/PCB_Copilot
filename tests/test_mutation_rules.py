@@ -9,10 +9,13 @@ from tests.conftest import load_golden
 from tests.mutation.ir_mutators import (
     FIRST_PACK_RULE_IDS,
     mutate_duplicate_reference,
+    mutate_missing_open_drain_pullup,
     mutate_missing_pin,
     mutate_missing_power_source,
     mutate_output_conflict,
+    mutate_reversed_polarity,
     mutate_undriven_input,
+    mutate_voltage_domain_conflict,
 )
 
 CLEAN_GOLDENS = ("rc_divider.json", "i2c_sensor.json")
@@ -36,6 +39,9 @@ def test_clean_goldens_have_no_first_pack_findings(name: str) -> None:
         (mutate_output_conflict, "elec.output_conflict"),
         (mutate_undriven_input, "elec.undriven_input"),
         (mutate_missing_power_source, "elec.power_source"),
+        (mutate_missing_open_drain_pullup, "elec.open_drain_pullup"),
+        (mutate_voltage_domain_conflict, "elec.voltage_domain"),
+        (mutate_reversed_polarity, "elec.polarity"),
     ],
     ids=[
         "unique_references",
@@ -43,6 +49,9 @@ def test_clean_goldens_have_no_first_pack_findings(name: str) -> None:
         "output_conflict",
         "undriven_input",
         "power_source",
+        "open_drain_pullup",
+        "voltage_domain",
+        "polarity",
     ],
 )
 @pytest.mark.parametrize("base", CLEAN_GOLDENS, ids=["rc_divider", "i2c_sensor"])

@@ -83,14 +83,9 @@ def default_tool_versions() -> dict[str, str]:
 
 def evaluate_clean_case(design: Design, *, case_id: str) -> CaseResult:
     findings = run_rules(design)
-    first_pack = {
-        "struct.unique_references",
-        "struct.pin_existence",
-        "elec.output_conflict",
-        "elec.undriven_input",
-        "elec.power_source",
-    }
-    detected = sorted({f.rule_id for f in findings if f.rule_id in first_pack})
+    from tests.mutation.ir_mutators import FIRST_PACK_RULE_IDS
+
+    detected = sorted({f.rule_id for f in findings if f.rule_id in FIRST_PACK_RULE_IDS})
     return CaseResult(
         case_id=case_id,
         base_design_id=design.id,
@@ -111,14 +106,9 @@ def evaluate_mutation_case(
     expected_rule_id: str,
 ) -> CaseResult:
     findings = run_rules(design)
-    first_pack = {
-        "struct.unique_references",
-        "struct.pin_existence",
-        "elec.output_conflict",
-        "elec.undriven_input",
-        "elec.power_source",
-    }
-    detected = sorted({f.rule_id for f in findings if f.rule_id in first_pack})
+    from tests.mutation.ir_mutators import FIRST_PACK_RULE_IDS
+
+    detected = sorted({f.rule_id for f in findings if f.rule_id in FIRST_PACK_RULE_IDS})
     passed = detected == [expected_rule_id]
     return CaseResult(
         case_id=case_id,
@@ -168,11 +158,15 @@ def run_first_pack_benchmark(fixtures_dir: Path) -> RunManifest:
         sys.path.insert(0, str(repo_root))
 
     from tests.mutation.ir_mutators import (
+        FIRST_PACK_RULE_IDS,
         mutate_duplicate_reference,
+        mutate_missing_open_drain_pullup,
         mutate_missing_pin,
         mutate_missing_power_source,
         mutate_output_conflict,
+        mutate_reversed_polarity,
         mutate_undriven_input,
+        mutate_voltage_domain_conflict,
     )
 
     golden_dir = fixtures_dir / "golden"
@@ -192,6 +186,9 @@ def run_first_pack_benchmark(fixtures_dir: Path) -> RunManifest:
             ("output_conflict", mutate_output_conflict, "elec.output_conflict"),
             ("undriven_input", mutate_undriven_input, "elec.undriven_input"),
             ("missing_power_source", mutate_missing_power_source, "elec.power_source"),
+            ("missing_open_drain_pullup", mutate_missing_open_drain_pullup, "elec.open_drain_pullup"),
+            ("voltage_domain_conflict", mutate_voltage_domain_conflict, "elec.voltage_domain"),
+            ("reversed_polarity", mutate_reversed_polarity, "elec.polarity"),
         ]
         for mut_name, mutator, expected in mutations:
             mutant = mutator(design)
@@ -210,18 +207,7 @@ def run_first_pack_benchmark(fixtures_dir: Path) -> RunManifest:
         conflict = Design.model_validate(json.loads(conflict_path.read_text(encoding="utf-8")))
         findings = run_rules(conflict)
         detected = sorted(
-            {
-                f.rule_id
-                for f in findings
-                if f.rule_id
-                in {
-                    "struct.unique_references",
-                    "struct.pin_existence",
-                    "elec.output_conflict",
-                    "elec.undriven_input",
-                    "elec.power_source",
-                }
-            }
+            {f.rule_id for f in findings if f.rule_id in FIRST_PACK_RULE_IDS}
         )
         cases.append(
             CaseResult(

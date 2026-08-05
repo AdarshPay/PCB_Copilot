@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install packages
+        run: |
+          python -m pip install -U pip hatchling
+          python -m pip install -e packages/circuit-ir
+          python -m pip install -e packages/evidence -e packages/transactions \
+            -e packages/verification -e packages/kicad-adapter -e packages/agent \
+            -e packages/simulation -e packages/benchmarks -e packages/component-library
+          python -m pip install -e apps/api -e services/worker
+          python -m pip install pytest pytest-asyncio ruff httpx
+
+      - name: CI hardware check (offline)
+        run: |
+          python -m pcb_ai_benchmarks.ci_check \
+            -o reports/ci-hardware-check.json \
+            --html reports/ci-hardware-check.html
+
+      - name: Pytest
+        run: pytest
+
+      - name: Upload hardware-check artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-hardware-check
+          path: |
+            reports/ci-hardware-check.json
+            reports/ci-hardware-check.html
+          if-no-files-found: warn

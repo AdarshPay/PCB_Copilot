@@ -18,7 +18,7 @@ from pcb_ai_circuit_ir.models import (
     Pin,
 )
 
-# Named first-pack rules covered by Days 8-9 mutation tests.
+# Named first-pack rules covered by mutation tests (Days 8-9 + Day 30 expansions).
 FIRST_PACK_RULE_IDS: frozenset[str] = frozenset(
     {
         "struct.unique_references",
@@ -26,6 +26,9 @@ FIRST_PACK_RULE_IDS: frozenset[str] = frozenset(
         "elec.output_conflict",
         "elec.undriven_input",
         "elec.power_source",
+        "elec.open_drain_pullup",
+        "elec.voltage_domain",
+        "elec.polarity",
     }
 )
 
@@ -156,4 +159,110 @@ def mutate_missing_power_source(design: Design) -> Design:
             uuid=str(uuid4()),
         )
     )
+    return mutant
+
+
+def mutate_missing_open_drain_pullup(design: Design) -> Design:
+    """Add an open-drain pin on a bus net with no passive pull-up to power."""
+    mutant = design.model_copy(deep=True)
+    mutant.components.append(
+        Component(
+            reference="U_MUT_OD",
+            value="MUT_OD",
+            functional_class=FunctionalClass.OTHER,
+            pins=[
+                Pin(number="1", name="OD", electrical_role=ElectricalRole.OPEN_DRAIN),
+            ],
+            uuid=str(uuid4()),
+        )
+    )
+    mutant.nets.append(
+        Net(
+            name="NET_MUT_OD",
+            net_class=NetClass.BUS,
+            protocol="i2c",
+            endpoints=[Endpoint(component_ref="U_MUT_OD", pin_number="1")],
+            uuid=str(uuid4()),
+        )
+    )
+    return mutant
+
+
+def mutate_voltage_domain_conflict(design: Design) -> Design:
+    """Place two declared voltage domains on the same signal net."""
+    mutant = design.model_copy(deep=True)
+    mutant.components.extend(
+        [
+            Component(
+                reference="U_MUT_VD_A",
+                value="MUT_VD_A",
+                functional_class=FunctionalClass.OTHER,
+                pins=[
+                    Pin(
+                        number="1",
+                        name="IO",
+                        electrical_role=ElectricalRole.DIGITAL_BIDIR,
+                        voltage_domain="3V3",
+                    ),
+                ],
+                uuid=str(uuid4()),
+            ),
+            Component(
+                reference="U_MUT_VD_B",
+                value="MUT_VD_B",
+                functional_class=FunctionalClass.OTHER,
+                pins=[
+                    Pin(
+                        number="1",
+                        name="IO",
+                        electrical_role=ElectricalRole.DIGITAL_BIDIR,
+                        voltage_domain="5V",
+                    ),
+                ],
+                uuid=str(uuid4()),
+            ),
+        ]
+    )
+    mutant.nets.append(
+        Net(
+            name="NET_MUT_VD",
+            net_class=NetClass.SIGNAL,
+            endpoints=[
+                Endpoint(component_ref="U_MUT_VD_A", pin_number="1"),
+                Endpoint(component_ref="U_MUT_VD_B", pin_number="1"),
+            ],
+            uuid=str(uuid4()),
+        )
+    )
+    return mutant
+
+
+def mutate_reversed_polarity(design: Design) -> Design:
+    """Add a polarized capacitor with + on ground and - on a power rail."""
+    mutant = design.model_copy(deep=True)
+    power_net = next((n for n in mutant.nets if n.net_class == NetClass.POWER), None)
+    ground_net = next((n for n in mutant.nets if n.net_class == NetClass.GROUND), None)
+    if power_net is None or ground_net is None:
+        raise ValueError("reversed_polarity mutation needs power and ground nets")
+
+    mutant.components.append(
+        Component(
+            reference="C_MUT_POL",
+            value="10uF",
+            functional_class=FunctionalClass.PASSIVE,
+            pins=[
+                Pin(number="1", name="+", electrical_role=ElectricalRole.PASSIVE),
+                Pin(number="2", name="-", electrical_role=ElectricalRole.PASSIVE),
+            ],
+            attributes={
+                "polarized": True,
+                "positive_pin": "1",
+                "negative_pin": "2",
+            },
+            uuid=str(uuid4()),
+        )
+    )
+    # Reversed: positive → ground, negative → power.
+    ground_net.endpoints.append(Endpoint(component_ref="C_MUT_POL", pin_number="1"))
+    power_net.endpoints.append(Endpoint(component_ref="C_MUT_POL", pin_number="2"))
     return mutant

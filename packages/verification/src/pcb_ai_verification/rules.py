@@ -5,12 +5,15 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from pcb_ai_circuit_ir.models import (
+    Component,
     Design,
     ElectricalRole,
     EvidenceRef,
     Finding,
+    FunctionalClass,
     Net,
     NetClass,
+    Pin,
     Severity,
 )
 
@@ -48,6 +51,9 @@ OUTPUT_DRIVER_ROLES: frozenset[ElectricalRole] = frozenset(
     }
 )
 
+# Protocols that require a passive pull-up to a power rail (explicit IR annotation).
+PULLUP_REQUIRED_PROTOCOLS: frozenset[str] = frozenset({"i2c"})
+
 
 def _pin_roles(design: Design) -> dict[tuple[str, str], ElectricalRole]:
     roles: dict[tuple[str, str], ElectricalRole] = {}
@@ -55,6 +61,18 @@ def _pin_roles(design: Design) -> dict[tuple[str, str], ElectricalRole]:
         for pin in component.pins:
             roles[(component.reference, pin.number)] = pin.electrical_role
     return roles
+
+
+def _pin_index(design: Design) -> dict[tuple[str, str], Pin]:
+    index: dict[tuple[str, str], Pin] = {}
+    for component in design.components:
+        for pin in component.pins:
+            index[(component.reference, pin.number)] = pin
+    return index
+
+
+def _components_by_ref(design: Design) -> dict[str, Component]:
+    return {component.reference: component for component in design.components}
 
 
 def _net_has_driver(net: Net, pin_roles: dict[tuple[str, str], ElectricalRole]) -> bool:
@@ -65,6 +83,69 @@ def _net_has_driver(net: Net, pin_roles: dict[tuple[str, str], ElectricalRole]) 
         pin_roles.get((ep.component_ref, ep.pin_number)) in NET_DRIVER_ROLES
         for ep in net.endpoints
     )
+
+
+def _is_power_rail(net: Net, pin_roles: dict[tuple[str, str], ElectricalRole]) -> bool:
+    """True when the net is classed as power or has a modeled power_out driver."""
+    if net.net_class == NetClass.POWER:
+        return True
+    return any(
+        pin_roles.get((ep.component_ref, ep.pin_number)) == ElectricalRole.POWER_OUT
+        for ep in net.endpoints
+    )
+
+
+def _is_ground_rail(net: Net, pin_roles: dict[tuple[str, str], ElectricalRole]) -> bool:
+    if net.net_class == NetClass.GROUND:
+        return True
+    return any(
+        pin_roles.get((ep.component_ref, ep.pin_number)) == ElectricalRole.GROUND
+        for ep in net.endpoints
+    )
+
+
+def _nets_for_pin(design: Design, component_ref: str, pin_number: str) -> list[Net]:
+    return [
+        net
+        for net in design.nets
+        if any(
+            ep.component_ref == component_ref and ep.pin_number == pin_number
+            for ep in net.endpoints
+        )
+    ]
+
+
+def _net_requires_pullup(net: Net, pin_roles: dict[tuple[str, str], ElectricalRole]) -> bool:
+    """Open-drain endpoints or an explicit I2C protocol annotation require a pull-up."""
+    if any(
+        pin_roles.get((ep.component_ref, ep.pin_number)) == ElectricalRole.OPEN_DRAIN
+        for ep in net.endpoints
+    ):
+        return True
+    protocol = (net.protocol or "").strip().lower()
+    return protocol in PULLUP_REQUIRED_PROTOCOLS
+
+
+def _net_has_passive_pullup_to_power(
+    net: Net,
+    design: Design,
+    pin_roles: dict[tuple[str, str], ElectricalRole],
+    comps: dict[str, Component],
+) -> bool:
+    """True if a passive bridges this net to a power rail (classic I2C pull-up)."""
+    for ep in net.endpoints:
+        component = comps.get(ep.component_ref)
+        if component is None or component.functional_class != FunctionalClass.PASSIVE:
+            continue
+        for other_pin in component.pins:
+            if other_pin.number == ep.pin_number:
+                continue
+            for other_net in _nets_for_pin(design, component.reference, other_pin.number):
+                if other_net is net:
+                    continue
+                if _is_power_rail(other_net, pin_roles):
+                    return True
+    return False
 
 
 def check_parse_schema(design: Design) -> list[Finding]:
@@ -255,6 +336,134 @@ def check_power_source(design: Design) -> list[Finding]:
     return findings
 
 
+def check_open_drain_pullup(design: Design) -> list[Finding]:
+    """Electrical: open-drain / I2C buses need a passive pull-up to a power rail.
+
+    Assumptions (high precision):
+    - Only nets with an open_drain endpoint or protocol='i2c' are checked.
+    - A valid pull-up is a PASSIVE component bridging the bus net to a power rail
+      (net_class=power or a power_out driver). Active/internal pull-ups are ignored.
+    """
+    pin_roles = _pin_roles(design)
+    comps = _components_by_ref(design)
+    findings: list[Finding] = []
+    for net in design.nets:
+        if not _net_requires_pullup(net, pin_roles):
+            continue
+        if _net_has_passive_pullup_to_power(net, design, pin_roles, comps):
+            continue
+        findings.append(
+            Finding(
+                rule_id="elec.open_drain_pullup",
+                severity=Severity.ERROR,
+                objects=[net.name],
+                explanation=(
+                    f"Open-drain/I2C net {net.name!r} has no passive pull-up to a power rail."
+                ),
+                evidence_refs=[
+                    EvidenceRef(
+                        id="rule:elec.open_drain_pullup",
+                        kind="rule",
+                        title="Open-drain bus without required pull-up",
+                    )
+                ],
+            )
+        )
+    return findings
+
+
+def check_voltage_domain(design: Design) -> list[Finding]:
+    """Electrical: declared voltage domains on one net must agree.
+
+    Assumptions (high precision):
+    - Only explicit non-null pin.voltage_domain and net.voltage_domain values participate.
+    - Comparison is exact string equality (e.g. '3V3' vs '5V'); undeclared pins are ignored.
+    """
+    pins = _pin_index(design)
+    findings: list[Finding] = []
+    for net in design.nets:
+        domains: set[str] = set()
+        if net.voltage_domain:
+            domains.add(net.voltage_domain)
+        for ep in net.endpoints:
+            pin = pins.get((ep.component_ref, ep.pin_number))
+            if pin is not None and pin.voltage_domain:
+                domains.add(pin.voltage_domain)
+        if len(domains) > 1:
+            findings.append(
+                Finding(
+                    rule_id="elec.voltage_domain",
+                    severity=Severity.ERROR,
+                    objects=[net.name, *sorted(domains)],
+                    explanation=(
+                        f"Net {net.name!r} mixes incompatible voltage domains: "
+                        f"{', '.join(sorted(domains))}."
+                    ),
+                    evidence_refs=[
+                        EvidenceRef(
+                            id="rule:elec.voltage_domain",
+                            kind="rule",
+                            title="Voltage-domain incompatibility",
+                        )
+                    ],
+                )
+            )
+    return findings
+
+
+def check_polarity(design: Design) -> list[Finding]:
+    """Electrical: polarized parts must not be reversed across power/ground.
+
+    Assumptions (high precision):
+    - Only components with attributes.polarized truthy are checked (explicit opt-in).
+    - positive_pin/anode_pin and negative_pin/cathode_pin identify terminals.
+    - Reversed means the positive terminal is on a ground rail while the negative
+      terminal is on a power rail. Other orientations are not flagged.
+    """
+    pin_roles = _pin_roles(design)
+    findings: list[Finding] = []
+    for component in design.components:
+        attrs = component.attributes or {}
+        if not attrs.get("polarized"):
+            continue
+        positive = attrs.get("positive_pin") or attrs.get("anode_pin")
+        negative = attrs.get("negative_pin") or attrs.get("cathode_pin")
+        if not positive or not negative:
+            continue
+        positive = str(positive)
+        negative = str(negative)
+        pos_nets = _nets_for_pin(design, component.reference, positive)
+        neg_nets = _nets_for_pin(design, component.reference, negative)
+        if not pos_nets or not neg_nets:
+            continue
+        pos_on_gnd = any(_is_ground_rail(net, pin_roles) for net in pos_nets)
+        neg_on_pwr = any(_is_power_rail(net, pin_roles) for net in neg_nets)
+        if pos_on_gnd and neg_on_pwr:
+            findings.append(
+                Finding(
+                    rule_id="elec.polarity",
+                    severity=Severity.ERROR,
+                    objects=[
+                        component.reference,
+                        f"{component.reference}.{positive}",
+                        f"{component.reference}.{negative}",
+                    ],
+                    explanation=(
+                        f"Polarized component {component.reference} appears reversed "
+                        f"(positive on ground, negative on power)."
+                    ),
+                    evidence_refs=[
+                        EvidenceRef(
+                            id="rule:elec.polarity",
+                            kind="rule",
+                            title="Polarity-sensitive device orientation",
+                        )
+                    ],
+                )
+            )
+    return findings
+
+
 RULE_PACK_V0: list[tuple[str, RuleFn]] = [
     ("struct.schema_validity", check_parse_schema),
     ("struct.unique_references", check_unique_references),
@@ -262,4 +471,7 @@ RULE_PACK_V0: list[tuple[str, RuleFn]] = [
     ("elec.output_conflict", check_output_conflicts),
     ("elec.undriven_input", check_undriven_inputs),
     ("elec.power_source", check_power_source),
+    ("elec.open_drain_pullup", check_open_drain_pullup),
+    ("elec.voltage_domain", check_voltage_domain),
+    ("elec.polarity", check_polarity),
 ]
