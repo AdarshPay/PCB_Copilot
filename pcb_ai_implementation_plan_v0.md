@@ -1,19 +1,32 @@
-# PCB AI Implementation Plan v0.1
+# PCB AI Implementation Plan v0.2
 
-Date: 2026-07-31
+Date: 2026-08-04  
+Supersedes: v0.1 (2026-07-31)
 
 ## 1. Product decision
 
-Build a verification-first KiCad copilot for schematic review and bounded schematic generation. Do not begin with autonomous layout or prompt-to-native-CAD generation.
+**North star:** PCB Copilot should work the way coding agents work for software engineering — an engineer describes intent, the agent proposes and applies changes in a tool-backed loop, deterministic checks gate correctness, and humans approve high-risk diffs — but for hardware (schematic + board).
 
-Initial supported domain:
+That end state requires a stack of capabilities built in order. Do **not** jump to layout or prompt-to-CAD before the foundations that make those loops safe and measurable.
+
+### Phased product direction
+
+| Phase | Goal | Analogy to SWE agents |
+|-------|------|------------------------|
+| **A — Foundations (current MVP)** | Ingest CAD → typed Circuit IR → deterministic checks → review report → reversible typed edits | Repo understanding, linters/tests, patch proposals |
+| **B — AI layout / redraw** | Agent places and routes a board from a verified schematic (or redraws an existing board) under DRC/constraint gates | Agent writes/refactors code with compile + test gates |
+| **C — Prompt to CAD** | Natural-language → bounded schematic + layout generation with the same verify/repair loop | “Build me an app that…” with scaffold + iterate |
+
+### Initial supported domain (all phases)
+
 - Low-voltage embedded boards
 - Microcontrollers and common sensors
 - LDO and simple buck power stages
 - I2C, SPI, UART, CAN, and RS-485 interfaces
 - Connectors, protection, programming, and test circuitry
 
-Initial user actions:
+### Phase A user actions (MVP)
+
 1. Import a KiCad project.
 2. Normalize it into a typed circuit IR.
 3. Run deterministic structural and electrical checks.
@@ -23,17 +36,20 @@ Initial user actions:
 7. Run KiCad ERC and semantic-regression checks.
 8. Present a diff for engineer approval.
 
+Phase A is the MVP. Phases B and C are explicit follow-ons once Phase A precision, round-trip, and transaction gates are met.
+
 ## 2. Architectural principles
 
 1. The circuit IR is the source of truth for AI reasoning.
 2. The LLM may propose typed operations but may not directly mutate production CAD files.
 3. Every operation has preconditions, postconditions, evidence, confidence, and rollback data.
-4. Deterministic tools decide syntax, graph integrity, and rule compliance.
+4. Deterministic tools decide syntax, graph integrity, rule compliance, and (later) DRC/constraint satisfaction.
 5. Simulation can add evidence but cannot prove package-level correctness.
-6. Human approval is required for electrical changes.
+6. Human approval is required for electrical and layout changes that affect production CAD.
 7. All data and model versions are recorded for replay.
+8. Layout and prompt-to-CAD reuse the same propose → verify → repair → approve loop as schematic edits; they are not a separate “generate and hope” path.
 
-## 3. MVP system architecture
+## 3. MVP system architecture (Phase A)
 
 ```text
 KiCad project
@@ -60,6 +76,22 @@ transaction compiler -> temporary KiCad branch
 review report -> human approval -> export
 ```
 
+### Later architecture (Phases B–C)
+
+```text
+Phase A stack (IR, verifier, transactions, ERC)
+    |
+    +----> PCB / layout IR + placement/routing operations
+    +----> kicad-cli DRC + constraint checks
+    +----> layout agent (redraw / auto-place / route) in temp branch
+    |
+    +----> prompt planner -> bounded generation plan
+    +----> schematic ops + layout ops in the same verify/repair loop
+    |
+    v
+review + board diff -> human approval -> export
+```
+
 ## 4. Recommended technology stack
 
 ### Core
@@ -76,6 +108,7 @@ review report -> human approval -> export
 - React/TypeScript web review workspace
 - A thin KiCad add-on that opens the current project in the review service and applies approved patches
 - Semantic diff views organized by components, pins, nets, requirements, and evidence
+- Later: placement/routing diffs and board preview for Phase B
 
 ### CAD and simulation
 - KiCad 10 as the primary compatibility target
@@ -86,9 +119,9 @@ review report -> human approval -> export
 
 ### AI
 - Existing hosted or open-weight language model with structured JSON outputs
-- No foundation-model training during MVP
+- No foundation-model training during Phase A MVP
 - Curated component facts plus retrieval from datasheets and application notes
-- Maximum three-step propose/verify/repair loop
+- Maximum three-step propose/verify/repair loop (extend similarly for layout in Phase B)
 
 ## 5. Monorepo layout
 
@@ -108,6 +141,7 @@ pcb-ai/
     simulation/           # ngspice jobs and assertions
     benchmarks/           # datasets, mutation engine, scoring
     component-library/    # curated component profiles
+    # later: layout / pcb-ir / routing agent packages for Phase B
   services/
     worker/               # ERC, parsing, retrieval, simulation jobs
   schemas/
@@ -189,6 +223,8 @@ Finding
 ```
 
 Treat nets as hyperedges connecting multiple component pins. Store the relational representation in PostgreSQL first; expose graph projections for algorithms rather than introducing Neo4j during the prototype.
+
+Phase B will extend this with board/layout representation (footprint instances, placement, nets on copper, constraints) while keeping Circuit IR as the electrical source of truth.
 
 ## 7. First deterministic rule pack
 
@@ -277,7 +313,9 @@ Suggested first families:
 - Engineer acceptance and edit rate
 - Review time reduction
 
-## 10. First two-week engineering sprint
+Phase B adds layout metrics (DRC regressions, route completion, constraint violations, engineer edit rate on placement). Phase C adds end-to-end prompt success under the same verify gates.
+
+## 10. First two-week engineering sprint (Phase A — done / historical)
 
 ### Days 1-2: foundations
 - Create monorepo and local Docker environment
@@ -305,28 +343,42 @@ Suggested first families:
 
 Sprint exit criterion: one real KiCad schematic can be ingested, normalized, checked, round-tripped, and reported without an LLM.
 
-## 11. 30/60/90-day plan
+## 11. Timeline: foundations → layout → prompt-to-CAD
 
-### Day 30
+### Day 30 (Phase A continue)
 - 10 deterministic checks
 - 10 clean projects and 100 mutations
 - Lossless or semantically equivalent KiCad round trips
 - HTML review report
 - CI command for repository-based hardware checks
 
-### Day 60
+### Day 60 (Phase A complete → agent-ready edits)
 - 20-30 curated component profiles
 - Datasheet evidence service
 - First LLM-generated typed remediation suggestions
 - Transaction compiler and temporary branch workflow
 - Engineer approval/rejection telemetry
+- **Gate to Phase B:** high-precision schematic rules, stable sch round-trip, reversible typed ops compiling to KiCad without corrupting production files
 
-### Day 90
-- KiCad add-on prototype
-- 20 clean projects and 200+ mutations
-- One bounded generation flow, such as MCU + I2C sensor + power + programming header
-- ERC and semantic repair loop
-- Small external design-partner pilot
+### Day 90 (Phase B start — AI layout / redraw)
+- PCB/board IR and placement/routing operation types
+- Ingest/round-trip `.kicad_pcb` for supported board subset
+- DRC normalization into findings (parallel to ERC)
+- First bounded layout agent: place + route a small verified schematic (or redraw an existing simple board) in a temp branch
+- Layout benchmarks: DRC clean rate, completion, engineer edit distance
+- KiCad add-on prototype for review + apply approved patches
+
+### Day 120 (Phase B deepen → Phase C start)
+- Stronger layout constraints (power, differential, keepouts) and repair loops
+- 20 clean projects with boards; layout mutation/eval set
+- **Phase C:** one bounded prompt-to-CAD flow (e.g. MCU + I2C sensor + power + programming header → schematic + first-pass layout)
+- Same propose/verify/repair/approve loop as coding agents; no direct production-file mutation
+- Small external design-partner pilot on review + assisted layout
+
+### Explicit sequencing rule
+
+Do not start Phase B layout work until Day-60 Phase A gates are met.  
+Do not start Phase C prompt-to-CAD until a Phase B layout loop can place/route a small board under DRC with human-approvable diffs.
 
 ## 12. Research workstreams
 
@@ -339,7 +391,8 @@ Sprint exit criterion: one real KiCad schematic can be ingested, normalized, che
 7. Build a fault taxonomy from real schematic review comments and public design mistakes.
 8. Measure whether LLM repair adds value after deterministic checks, rather than measuring attractive schematic appearance.
 9. Study licensing of KiCad libraries, open-hardware projects, manufacturer documents, and research datasets before ingestion.
-10. Defer placement/routing work until the schematic-review metrics meet launch gates; use PCBWorld as the later routing baseline.
+10. After Phase A gates: evaluate placement/routing baselines (including PCBWorld and KiCad-native flows) for Phase B; measure agent layout with DRC + engineer edit rate, not visual appeal alone.
+11. Study how SWE coding-agent UX (plan → tool use → tests → PR diff) maps to schematic/board diffs and approval.
 
 ## 13. Immediate decisions
 
@@ -349,8 +402,10 @@ Sprint exit criterion: one real KiCad schematic can be ingested, normalized, che
 - Build a component ontology and rule engine before any fine-tuning.
 - Curate a small component set and benchmark before broad datasheet ingestion.
 - Make patches reversible and branch-only.
-- Keep Altium as phase two; begin API/SDK access work in parallel only after the KiCad core is stable.
-- Do not implement routing in the MVP.
+- Keep Altium as a later CAD target; begin API/SDK access work in parallel only after the KiCad core is stable.
+- **Phase A MVP does not implement routing/layout**; Phase B does, only after Phase A gates.
+- **Prompt-to-CAD is Phase C**, after a working layout verify/repair loop exists.
+- Product success looks like an agentic hardware workflow (intent → tools → checks → approvable CAD diff), not one-shot pretty boards.
 
 ## 14. Main technical risks
 
@@ -360,12 +415,21 @@ Sprint exit criterion: one real KiCad schematic can be ingested, normalized, che
 4. Low-precision findings that cause alert fatigue
 5. Lack of legally usable defective schematics
 6. Over-scoping the component universe
-7. Treating ERC or SPICE success as product-level correctness
+7. Treating ERC, DRC, or SPICE success as product-level correctness
 8. Agent edits that are syntactically valid but semantically destructive
+9. Starting layout or prompt-to-CAD before verification/transaction gates, producing untrustworthy agent loops
+10. Layout agents that optimize for appearance over electrical/constraint correctness
 
-## 15. First implementation milestone
+## 15. Milestones
 
-The first meaningful milestone is not “generate a PCB.” It is:
+### Phase A milestone (current MVP)
 
-> Given a KiCad schematic, produce a deterministic semantic graph, identify five injected electrical faults with high precision, cite the rule or component evidence, generate reversible candidate repairs, and prove that the approved repair compiles and does not introduce new ERC violations.
+> Given a KiCad schematic, produce a deterministic semantic graph, identify injected electrical faults with high precision, cite the rule or component evidence, generate reversible candidate repairs, and prove that the approved repair compiles and does not introduce new ERC violations.
 
+### Phase B milestone
+
+> Given a verified schematic (or simple existing board), the agent proposes placement/routing operations, applies them only on a temporary KiCad branch, passes DRC/constraint checks (or repairs until it does), and presents an approvable board diff — the hardware analogue of an agent opening a PR after tests pass.
+
+### Phase C milestone
+
+> From a bounded natural-language prompt, generate schematic + first-pass layout through the same IR, tools, checks, and approval loop — closer to “describe the system; get a reviewable CAD change set,” not unconstrained one-shot generation.

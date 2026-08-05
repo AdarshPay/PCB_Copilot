@@ -23,12 +23,28 @@ FIRST_PACK_RULE_IDS: frozenset[str] = frozenset(
     {
         "struct.unique_references",
         "struct.pin_existence",
+        "struct.footprint_presence",
         "elec.output_conflict",
         "elec.undriven_input",
         "elec.power_source",
         "elec.open_drain_pullup",
         "elec.voltage_domain",
         "elec.polarity",
+    }
+)
+
+# Classes that must declare footprint_ref (mirrors verification FOOTPRINT_REQUIRED_CLASSES).
+_FOOTPRINT_REQUIRED: frozenset[FunctionalClass] = frozenset(
+    {
+        FunctionalClass.MCU,
+        FunctionalClass.SENSOR,
+        FunctionalClass.REGULATOR_LDO,
+        FunctionalClass.REGULATOR_BUCK,
+        FunctionalClass.TRANSCEIVER,
+        FunctionalClass.CONNECTOR,
+        FunctionalClass.PROTECTION,
+        FunctionalClass.INTERFACE_BRIDGE,
+        FunctionalClass.PROGRAMMING,
     }
 )
 
@@ -73,6 +89,28 @@ def mutate_missing_pin(design: Design) -> Design:
     return mutant
 
 
+def mutate_missing_footprint(design: Design) -> Design:
+    """Clear footprint_ref on a required-class part, or add an MCU without one."""
+    mutant = design.model_copy(deep=True)
+    for component in mutant.components:
+        if component.functional_class in _FOOTPRINT_REQUIRED:
+            component.footprint_ref = None
+            return mutant
+    mutant.components.append(
+        Component(
+            reference="U_MUT_FP",
+            value="MUT_NO_FP",
+            functional_class=FunctionalClass.MCU,
+            footprint_ref=None,
+            pins=[
+                Pin(number="1", name="NC", electrical_role=ElectricalRole.UNSPECIFIED),
+            ],
+            uuid=str(uuid4()),
+        )
+    )
+    return mutant
+
+
 def mutate_output_conflict(design: Design) -> Design:
     """Tie a second digital output onto an existing driven signal net."""
     mutant = design.model_copy(deep=True)
@@ -80,6 +118,7 @@ def mutate_output_conflict(design: Design) -> Design:
         reference="U_MUT_OUT",
         value="MUT_DRIVER",
         functional_class=FunctionalClass.MCU,
+        footprint_ref="Package_DFN_QFN:QFN-32-1EP_5x5mm_P0.5mm",
         pins=[
             Pin(number="1", name="OUT", electrical_role=ElectricalRole.DIGITAL_OUT),
         ],

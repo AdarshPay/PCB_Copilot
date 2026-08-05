@@ -54,6 +54,22 @@ OUTPUT_DRIVER_ROLES: frozenset[ElectricalRole] = frozenset(
 # Protocols that require a passive pull-up to a power rail (explicit IR annotation).
 PULLUP_REQUIRED_PROTOCOLS: frozenset[str] = frozenset({"i2c"})
 
+# Functional classes that must declare a footprint_ref (bridge toward Phase B layout).
+# Passives and OTHER are exempt; no CAD library lookup in Phase A.
+FOOTPRINT_REQUIRED_CLASSES: frozenset[FunctionalClass] = frozenset(
+    {
+        FunctionalClass.MCU,
+        FunctionalClass.SENSOR,
+        FunctionalClass.REGULATOR_LDO,
+        FunctionalClass.REGULATOR_BUCK,
+        FunctionalClass.TRANSCEIVER,
+        FunctionalClass.CONNECTOR,
+        FunctionalClass.PROTECTION,
+        FunctionalClass.INTERFACE_BRIDGE,
+        FunctionalClass.PROGRAMMING,
+    }
+)
+
 
 def _pin_roles(design: Design) -> dict[tuple[str, str], ElectricalRole]:
     roles: dict[tuple[str, str], ElectricalRole] = {}
@@ -222,6 +238,40 @@ def check_pin_existence(design: Design) -> list[Finding]:
                         ],
                     )
                 )
+    return findings
+
+
+def check_footprint_presence(design: Design) -> list[Finding]:
+    """Structural: placement-bound classes must declare a footprint_ref.
+
+    Assumptions (high precision):
+    - Only FOOTPRINT_REQUIRED_CLASSES are checked (MCU, sensor, regulators, etc.).
+    - Passives and OTHER are exempt; no KiCad library existence lookup yet.
+    """
+    findings: list[Finding] = []
+    for component in design.components:
+        if component.functional_class not in FOOTPRINT_REQUIRED_CLASSES:
+            continue
+        if component.footprint_ref and str(component.footprint_ref).strip():
+            continue
+        findings.append(
+            Finding(
+                rule_id="struct.footprint_presence",
+                severity=Severity.ERROR,
+                objects=[component.reference, component.functional_class.value],
+                explanation=(
+                    f"Component {component.reference} ({component.functional_class.value}) "
+                    f"is missing footprint_ref."
+                ),
+                evidence_refs=[
+                    EvidenceRef(
+                        id="rule:struct.footprint_presence",
+                        kind="rule",
+                        title="Footprint presence",
+                    )
+                ],
+            )
+        )
     return findings
 
 
@@ -468,6 +518,7 @@ RULE_PACK_V0: list[tuple[str, RuleFn]] = [
     ("struct.schema_validity", check_parse_schema),
     ("struct.unique_references", check_unique_references),
     ("struct.pin_existence", check_pin_existence),
+    ("struct.footprint_presence", check_footprint_presence),
     ("elec.output_conflict", check_output_conflicts),
     ("elec.undriven_input", check_undriven_inputs),
     ("elec.power_source", check_power_source),

@@ -11,7 +11,7 @@ from tests.conftest import FIXTURES
 def test_first_pack_benchmark_manifest(tmp_path: Path) -> None:
     fixtures_dir = FIXTURES.parent  # tests/fixtures
     manifest = run_first_pack_benchmark(fixtures_dir)
-    assert manifest.summary["total"] >= 17  # 2 clean + 2*8 mutations + conflict fixture
+    assert manifest.summary["total"] >= 37  # 4 clean + 4*9 mutations + conflict fixture
     assert manifest.summary["failed"] == 0
     assert manifest.summary["passed"] == manifest.summary["total"]
     assert manifest.artifact_hashes

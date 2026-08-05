@@ -48,6 +48,7 @@ def test_rule_pack_includes_first_pack_checks() -> None:
     assert ids >= {
         "struct.unique_references",
         "struct.pin_existence",
+        "struct.footprint_presence",
         "elec.output_conflict",
         "elec.undriven_input",
         "elec.power_source",
@@ -57,6 +58,28 @@ def test_rule_pack_includes_first_pack_checks() -> None:
     }
 
 
+def test_footprint_presence_detected() -> None:
+    design = load_golden("rc_divider.json")
+    design.components.append(
+        Component(
+            reference="U6",
+            value="MCU",
+            functional_class=FunctionalClass.MCU,
+            footprint_ref=None,
+            pins=[Pin(number="1", name="NC", electrical_role=ElectricalRole.UNSPECIFIED)],
+        )
+    )
+    findings = run_rules(design)
+    assert any(f.rule_id == "struct.footprint_presence" for f in findings)
+
+
+def test_passive_without_footprint_is_exempt() -> None:
+    design = load_golden("rc_divider.json")
+    design.components[0].footprint_ref = None
+    findings = run_rules(design)
+    assert not any(f.rule_id == "struct.footprint_presence" for f in findings)
+
+
 def test_undriven_input_detected() -> None:
     design = load_golden("rc_divider.json")
     design.components.append(
@@ -64,6 +87,7 @@ def test_undriven_input_detected() -> None:
             reference="U9",
             value="SENSOR",
             functional_class=FunctionalClass.SENSOR,
+            footprint_ref="Package_TO_SOT_SMD:SOT-23",
             pins=[Pin(number="1", name="RESET", electrical_role=ElectricalRole.RESET)],
         )
     )

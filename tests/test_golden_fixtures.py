@@ -24,9 +24,15 @@ def test_golden_fixtures_validate(path: Path) -> None:
     assert round_trip.id == design.id
 
 
-def test_three_golden_circuits_exist() -> None:
+def test_clean_and_conflict_goldens_exist() -> None:
     names = {p.stem for p in GOLDEN_FILES}
-    assert names >= {"rc_divider", "i2c_sensor", "output_conflict"}
+    assert names >= {
+        "rc_divider",
+        "i2c_sensor",
+        "output_conflict",
+        "ldo_rail",
+        "uart_bridge",
+    }
 
 
 def test_load_helper() -> None:

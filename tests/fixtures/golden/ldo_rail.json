@@ -1,0 +1,183 @@
+{
+  "id": "fixture.ldo_rail",
+  "source_tool": "synthetic",
+  "source_version": "fixture-0.1",
+  "revision": "1",
+  "name": "LDO 5V to 3V3 rail with local caps",
+  "requirements": [
+    {
+      "id": "req.ldo_rail",
+      "text": "AP2112K-3.3 regulates VIN_5V to 3V3 with input and output capacitors.",
+      "priority": "must"
+    }
+  ],
+  "blocks": [
+    {
+      "id": "blk.power",
+      "name": "Power",
+      "component_refs": ["U1", "C1", "C2"]
+    }
+  ],
+  "components": [
+    {
+      "reference": "U1",
+      "manufacturer_part_number": "AP2112K-3.3",
+      "value": "3.3V",
+      "functional_class": "regulator_ldo",
+      "symbol_ref": "Regulator_Linear:AP2112K-3.3",
+      "footprint_ref": "Package_TO_SOT_SMD:SOT-23-5",
+      "pins": [
+        {
+          "number": "1",
+          "name": "VIN",
+          "electrical_role": "power_in",
+          "voltage_domain": "5V"
+        },
+        {
+          "number": "2",
+          "name": "GND",
+          "electrical_role": "ground",
+          "voltage_domain": "GND"
+        },
+        {
+          "number": "3",
+          "name": "EN",
+          "electrical_role": "enable",
+          "voltage_domain": "5V"
+        },
+        {
+          "number": "4",
+          "name": "NC",
+          "electrical_role": "no_connect"
+        },
+        {
+          "number": "5",
+          "name": "VOUT",
+          "electrical_role": "power_out",
+          "voltage_domain": "3V3"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000031"
+    },
+    {
+      "reference": "C1",
+      "value": "1uF",
+      "functional_class": "passive",
+      "symbol_ref": "Device:C",
+      "footprint_ref": "Capacitor_SMD:C_0603_1608Metric",
+      "pins": [
+        {
+          "number": "1",
+          "name": "1",
+          "electrical_role": "passive"
+        },
+        {
+          "number": "2",
+          "name": "2",
+          "electrical_role": "passive"
+        }
+      ],
+      "attributes": {
+        "role": "input_cap"
+      },
+      "uuid": "00000000-0000-4000-8000-000000000032"
+    },
+    {
+      "reference": "C2",
+      "value": "1uF",
+      "functional_class": "passive",
+      "symbol_ref": "Device:C",
+      "footprint_ref": "Capacitor_SMD:C_0603_1608Metric",
+      "pins": [
+        {
+          "number": "1",
+          "name": "1",
+          "electrical_role": "passive"
+        },
+        {
+          "number": "2",
+          "name": "2",
+          "electrical_role": "passive"
+        }
+      ],
+      "attributes": {
+        "role": "output_cap"
+      },
+      "uuid": "00000000-0000-4000-8000-000000000033"
+    }
+  ],
+  "nets": [
+    {
+      "name": "VIN_5V",
+      "class": "power",
+      "voltage_domain": "5V",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "1"
+        },
+        {
+          "component_ref": "U1",
+          "pin_number": "3"
+        },
+        {
+          "component_ref": "C1",
+          "pin_number": "1"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000d1"
+    },
+    {
+      "name": "3V3",
+      "class": "power",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "5"
+        },
+        {
+          "component_ref": "C2",
+          "pin_number": "1"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000d2"
+    },
+    {
+      "name": "GND",
+      "class": "ground",
+      "voltage_domain": "GND",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "2"
+        },
+        {
+          "component_ref": "C1",
+          "pin_number": "2"
+        },
+        {
+          "component_ref": "C2",
+          "pin_number": "2"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000d3"
+    }
+  ],
+  "assertions": [
+    {
+      "id": "assert.ldo_caps",
+      "kind": "power",
+      "expression": "LDO has local input and output capacitors to GND",
+      "severity": "warning"
+    }
+  ],
+  "evidence_refs": [
+    {
+      "id": "fixture:ldo_rail",
+      "kind": "fixture",
+      "title": "Golden LDO rail",
+      "confidence": 1.0
+    }
+  ]
+}

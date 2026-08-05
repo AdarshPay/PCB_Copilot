@@ -1,0 +1,204 @@
+{
+  "id": "fixture.uart_bridge",
+  "source_tool": "synthetic",
+  "source_version": "fixture-0.1",
+  "revision": "1",
+  "name": "USB-UART bridge to MCU",
+  "requirements": [
+    {
+      "id": "req.uart_link",
+      "text": "CP2102 bridges USB to MCU UART0 with shared 3V3 and GND.",
+      "priority": "must"
+    }
+  ],
+  "blocks": [
+    {
+      "id": "blk.mcu",
+      "name": "MCU",
+      "component_refs": ["U1"]
+    },
+    {
+      "id": "blk.bridge",
+      "name": "USB-UART",
+      "component_refs": ["U2"]
+    }
+  ],
+  "components": [
+    {
+      "reference": "U1",
+      "manufacturer_part_number": "RP2040",
+      "value": "RP2040",
+      "functional_class": "mcu",
+      "symbol_ref": "MCU_RaspberryPi:RP2040",
+      "footprint_ref": "Package_DFN_QFN:QFN-56-1EP_7x7mm_P0.4mm",
+      "pins": [
+        {
+          "number": "1",
+          "name": "GPIO0",
+          "electrical_role": "digital_in",
+          "interface_role": "uart_rx",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "2",
+          "name": "GPIO1",
+          "electrical_role": "digital_out",
+          "interface_role": "uart_tx",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "3",
+          "name": "VDD",
+          "electrical_role": "power_in",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "4",
+          "name": "GND",
+          "electrical_role": "ground",
+          "voltage_domain": "GND"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000041"
+    },
+    {
+      "reference": "U2",
+      "manufacturer_part_number": "CP2102",
+      "value": "CP2102",
+      "functional_class": "interface_bridge",
+      "symbol_ref": "Interface_USB:CP2102",
+      "footprint_ref": "Package_SO:SOIC-28W_7.5x17.9mm_P1.27mm",
+      "pins": [
+        {
+          "number": "1",
+          "name": "TXD",
+          "electrical_role": "digital_out",
+          "interface_role": "uart_tx",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "2",
+          "name": "RXD",
+          "electrical_role": "digital_in",
+          "interface_role": "uart_rx",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "3",
+          "name": "VDD",
+          "electrical_role": "power_in",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "4",
+          "name": "GND",
+          "electrical_role": "ground",
+          "voltage_domain": "GND"
+        },
+        {
+          "number": "5",
+          "name": "VBUS",
+          "electrical_role": "power_in",
+          "voltage_domain": "5V"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000042"
+    }
+  ],
+  "nets": [
+    {
+      "name": "3V3",
+      "class": "power",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "3"
+        },
+        {
+          "component_ref": "U2",
+          "pin_number": "3"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000e1"
+    },
+    {
+      "name": "GND",
+      "class": "ground",
+      "voltage_domain": "GND",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "4"
+        },
+        {
+          "component_ref": "U2",
+          "pin_number": "4"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000e2"
+    },
+    {
+      "name": "UART_TX",
+      "class": "signal",
+      "protocol": "uart",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U2",
+          "pin_number": "1"
+        },
+        {
+          "component_ref": "U1",
+          "pin_number": "1"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000e3"
+    },
+    {
+      "name": "UART_RX",
+      "class": "signal",
+      "protocol": "uart",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "2"
+        },
+        {
+          "component_ref": "U2",
+          "pin_number": "2"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000e4"
+    },
+    {
+      "name": "VBUS_5V",
+      "class": "power",
+      "voltage_domain": "5V",
+      "endpoints": [
+        {
+          "component_ref": "U2",
+          "pin_number": "5"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000e5"
+    }
+  ],
+  "assertions": [
+    {
+      "id": "assert.uart_cross",
+      "kind": "interface",
+      "expression": "Bridge TX drives MCU RX; MCU TX drives bridge RX",
+      "severity": "error"
+    }
+  ],
+  "evidence_refs": [
+    {
+      "id": "fixture:uart_bridge",
+      "kind": "fixture",
+      "title": "Golden USB-UART bridge",
+      "confidence": 1.0
+    }
+  ]
+}

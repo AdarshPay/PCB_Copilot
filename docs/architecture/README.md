@@ -1,14 +1,15 @@
 # Architecture notes
 
 See `pcb_ai_implementation_plan_v0.md` at the repository root for the product decision,
-MVP architecture, Circuit IR, rule pack, and 30/60/90 plan.
+Phase A MVP architecture, Circuit IR, rule pack, and foundations → layout → prompt-to-CAD timeline.
 
 ## Source of truth
 
 1. Circuit IR for AI reasoning
-2. Deterministic tools for syntax, graph integrity, and rule compliance
-3. Human approval for electrical changes
+2. Deterministic tools for syntax, graph integrity, and rule compliance (later: DRC/constraints for layout)
+3. Human approval for electrical and layout changes that affect production CAD
 4. Branch-only reversible patches — never direct production CAD mutation by the LLM
+5. North star: coding-agent loop for hardware; Phase B layout then Phase C prompt-to-CAD after Phase A gates
 
 ## Native verification (KiCad ERC)
 

@@ -3,11 +3,13 @@
 Date: 2026-08-04  
 Repo: https://github.com/AdarshPay/PCB_Copilot  
 Branch: `main`  
-Plan of record: `pcb_ai_implementation_plan_v0.md`
+Plan of record: `pcb_ai_implementation_plan_v0.md` (v0.2)
 
 ## Product in one sentence
 
-Verification-first KiCad schematic copilot: ingest a schematic → typed Circuit IR → deterministic checks (+ optional KiCad ERC) → review report. The LLM must **not** mutate production CAD; patches are typed, reversible, and human-approved later.
+**North star:** coding-agent workflow for hardware (intent → tools → checks → approvable CAD diff).  
+**Current MVP (Phase A):** verification-first KiCad schematic copilot — ingest → typed Circuit IR → deterministic checks (+ optional KiCad ERC) → review report. The LLM must **not** mutate production CAD; patches are typed, reversible, and human-approved.  
+**Later:** Phase B AI layout/redraw, then Phase C prompt-to-CAD — only after Phase A gates (see `pcb_ai_implementation_plan_v0.md` v0.2).
 
 ## Sprint status
 
@@ -17,13 +19,13 @@ Verification-first KiCad schematic copilot: ingest a schematic → typed Circuit
 | 3–5 KiCad ingest | Done | Parse/normalize/round-trip `.kicad_sch` |
 | 6–7 Native ERC | Done | ERC→Finding, Docker image, offline tests |
 | 8–9 First rules + mutations | Done | Five first-pack rules + single-fault mutations |
-| 10 Review artifact | Done (local; push with this handoff) | JSON + HTML report, run manifest |
-| Day 30 rules (partial) | In progress | +3 electrical rules (pull-up, voltage domain, polarity); 9 total in RULE_PACK_V0 |
+| 10 Review artifact | Done | JSON + HTML report, run manifest |
+| Day 30 rules | Done | 10 checks in RULE_PACK_V0 (incl. footprint presence) |
 | Day 30 CI command | Done | Offline ingest + rules + ERC fixture; `.github/workflows/ci.yml` |
 
 **Sprint exit criterion (met):** one schematic can be ingested, normalized, checked, round-tripped, and reported **without an LLM**.
 
-**Next horizon:** Day 30 goals in the plan (10 checks, more fixtures/mutations; CI hardware-check command is done). Do **not** jump to layout/routing or broad LLM generation.
+**Next horizon:** Finish remaining Day 30 scale (more clean projects / mutations toward 10/100), then Day 60 Phase A complete (profiles → evidence → typed LLM remediations → transactions). **Gate to Phase B** AI layout/redraw, then Phase C prompt-to-CAD. Do **not** start layout or prompt-to-CAD until Phase A gates in the plan are met.
 
 ## Architecture (source of truth)
 
@@ -59,7 +61,7 @@ packages/evidence|agent|simulation|component-library/  stubs / early models
 services/worker/          Redis jobs: verify_design, run_erc
 infra/local-compose.yml   Postgres(pgvector), Redis, MinIO
 infra/docker/kicad-cli/   KiCad 10 CLI image wrapper
-tests/fixtures/golden/    IR JSON fixtures
+tests/fixtures/golden/    IR JSON fixtures (rc_divider, i2c_sensor, ldo_rail, uart_bridge, output_conflict)
 tests/fixtures/kicad/     rc_divider.kicad_sch + ERC JSON fixture
 tests/mutation/           single-fault IR mutators
 ```
@@ -87,6 +89,7 @@ Pydantic v2 models in `packages/circuit-ir`. Nets are hyperedges (multi-pin). Ex
 - `elec.open_drain_pullup` (open_drain endpoints or protocol=i2c need passive→power pull-up)
 - `elec.voltage_domain` (explicit pin/net voltage_domain strings must agree on a net)
 - `elec.polarity` (opt-in `attributes.polarized` + positive/negative pins; flags +on-GND/−on-power)
+- `struct.footprint_presence` (MCU/sensor/regulator/connector/… must declare `footprint_ref`; passives/OTHER exempt)
 
 ### ERC
 - Parse KiCad ERC JSON + classic `.rpt` → `Finding` (`source=kicad_erc`)
@@ -98,7 +101,7 @@ Pydantic v2 models in `packages/circuit-ir`. Nets are hyperedges (multi-pin). Ex
 - `build_review_report()` → findings, summary, net fragments (current or before/after)
 - `render_html_report()` → self-contained HTML
 - API: `POST /v1/reviews`, `POST /v1/reviews/html`
-- Benchmark: `python -m pcb_ai_benchmarks -o reports/run-manifest.json` (19 cases: 2 clean × 8 mutations + conflict fixture)
+- Benchmark: `python -m pcb_ai_benchmarks -o reports/run-manifest.json` (41 cases: 4 clean × 9 mutations + conflict fixture)
 - CI hardware check: `python -m pcb_ai_benchmarks.ci_check` (offline ERC fixture; no Docker KiCad)
 
 ## How to run locally
@@ -134,7 +137,7 @@ Notes:
 
 ## Tests
 
-Expect **68 passed** after Day 30 rule expansions (`pytest`). Key suites:
+Expect **94 passed** after Day 30 completion (`pytest`). Key suites:
 - `tests/test_golden_fixtures.py`, `test_rules.py`, `test_mutation_rules.py`
 - `tests/test_parser.py`, `test_roundtrip_kicad.py`
 - `tests/test_erc.py`, `test_report.py`, `test_benchmark_manifest.py`, `test_ci_hardware_check.py`, `test_api.py`
@@ -146,28 +149,31 @@ Expect **68 passed** after Day 30 rule expansions (`pytest`). Key suites:
 - Full transaction compiler → temporary KiCad branch workflow
 - Curated 20–30 component profiles + datasheet evidence service
 - ngspice simulation jobs
-- Altium support, placement/routing
+- Altium support
+- **Phase B:** AI placement/routing / board redraw
+- **Phase C:** prompt-to-CAD
 - Live ERC in CI (image exists; unit tests are fixture-based)
-- Expanding beyond ~9 high-precision rules to the full §7 pack
+- Full §7 rule pack beyond the current 10 high-precision checks
+- Day 30 scale target of 10 clean projects / 100 mutations (currently 4 clean goldens + 1 conflict fixture)
 
-## Recommended next work (Day 30 track)
+## Recommended next work (toward Day 60 → Phase B layout)
 
 Prioritize in order:
-1. **More deterministic rules** from remaining plan §7 checks (e.g. footprint existence, duplicate net labels, regulator constraints, reset/enable if distinct from `elec.undriven_input`) — `elec.open_drain_pullup`, `elec.voltage_domain`, and `elec.polarity` already landed; one mutation test each; keep high precision; avoid noisy AI findings.
-2. **More clean KiCad projects + mutations** toward 10 clean / 100 mutations; keep project-family splits in mind.
-3. Harden KiCad normalize for hierarchy / multi-sheet / real libraries (round-trip UUID/hierarchy research item).
-4. Only after precision is solid: component profiles, then evidence retrieval, then typed LLM remediations (Day 60).
+1. **More clean KiCad projects + mutations** toward 10 clean / 100 mutations; keep project-family splits in mind.
+2. Harden KiCad normalize for hierarchy / multi-sheet / real libraries (round-trip UUID/hierarchy research item).
+3. **Day 60 / Phase A complete:** curated component profiles → datasheet evidence → typed LLM remediations → transaction compiler (temp KiCad branch + human approve). This is the **gate to Phase B**.
+4. Only after Phase A gates: PCB IR + DRC + layout agent (Phase B), then bounded prompt-to-CAD (Phase C).
 
-(CI hardware-check is done — see sprint table / `ci_check` + `.github/workflows/ci.yml`.)
+(Day 30 rule count and CI hardware-check are done — 10 checks in `RULE_PACK_V0`; see `ci_check` + `.github/workflows/ci.yml`.)
 
 ## Guardrails for the next agent
 
 - Prefer small, test-backed diffs over broad refactors.
-- Do not enable LLM CAD mutation.
-- Do not start routing / autonomous layout.
-- Keep ERC/SPICE success from being treated as product-level correctness.
+- Do not enable LLM CAD mutation of production files; branch-only + human approval.
+- Do not start routing / autonomous layout or prompt-to-CAD until Phase A gates in the plan are met.
+- Keep ERC/DRC/SPICE success from being treated as product-level correctness.
 - Commit only when the user asks; never force-push `main`.
-- Read `pcb_ai_implementation_plan_v0.md` before changing product direction.
+- Read `pcb_ai_implementation_plan_v0.md` (v0.2) before changing product direction.
 
 ## Key entry files
 

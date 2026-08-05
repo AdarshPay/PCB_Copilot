@@ -9,6 +9,7 @@ from tests.conftest import load_golden
 from tests.mutation.ir_mutators import (
     FIRST_PACK_RULE_IDS,
     mutate_duplicate_reference,
+    mutate_missing_footprint,
     mutate_missing_open_drain_pullup,
     mutate_missing_pin,
     mutate_missing_power_source,
@@ -18,7 +19,12 @@ from tests.mutation.ir_mutators import (
     mutate_voltage_domain_conflict,
 )
 
-CLEAN_GOLDENS = ("rc_divider.json", "i2c_sensor.json")
+CLEAN_GOLDENS = (
+    "rc_divider.json",
+    "i2c_sensor.json",
+    "ldo_rail.json",
+    "uart_bridge.json",
+)
 
 
 def _first_pack_ids(findings) -> set[str]:
@@ -36,6 +42,7 @@ def test_clean_goldens_have_no_first_pack_findings(name: str) -> None:
     [
         (mutate_duplicate_reference, "struct.unique_references"),
         (mutate_missing_pin, "struct.pin_existence"),
+        (mutate_missing_footprint, "struct.footprint_presence"),
         (mutate_output_conflict, "elec.output_conflict"),
         (mutate_undriven_input, "elec.undriven_input"),
         (mutate_missing_power_source, "elec.power_source"),
@@ -46,6 +53,7 @@ def test_clean_goldens_have_no_first_pack_findings(name: str) -> None:
     ids=[
         "unique_references",
         "pin_existence",
+        "footprint_presence",
         "output_conflict",
         "undriven_input",
         "power_source",
@@ -54,7 +62,11 @@ def test_clean_goldens_have_no_first_pack_findings(name: str) -> None:
         "polarity",
     ],
 )
-@pytest.mark.parametrize("base", CLEAN_GOLDENS, ids=["rc_divider", "i2c_sensor"])
+@pytest.mark.parametrize(
+    "base",
+    CLEAN_GOLDENS,
+    ids=["rc_divider", "i2c_sensor", "ldo_rail", "uart_bridge"],
+)
 def test_single_fault_fires_expected_rule(mutator, expected_rule: str, base: str) -> None:
     clean = load_golden(base)
     assert _first_pack_ids(run_rules(clean)) == set()

@@ -1,10 +1,12 @@
 # PCB Copilot
 
-Verification-first KiCad copilot for schematic review and bounded schematic generation.
+Agentic KiCad copilot for hardware — aimed at the same loop coding agents use in software (intent → tools → checks → approvable diff), built in phases.
 
-The circuit IR is the source of truth. Deterministic tools own syntax, graph integrity, and rule compliance. The LLM may propose typed operations but never mutates production CAD files directly. Human approval is required for electrical changes.
+**Phase A (current MVP):** verification-first schematic review. Circuit IR is the source of truth; deterministic tools own syntax, graph integrity, and rule compliance. The LLM may propose typed operations but never mutates production CAD directly; human approval is required.
 
-## Current milestone (Sprint day 10+)
+**Later:** Phase B AI layout/redraw, then Phase C prompt-to-CAD — only after Phase A gates. See `pcb_ai_implementation_plan_v0.md`.
+
+## Current milestone (Sprint day 10+ / Phase A)
 
 - Machine-readable `ReviewReport` with findings, net fragments, and summary
 - HTML semantic review report (`POST /v1/reviews/html`, CLI `--html`)
@@ -91,4 +93,4 @@ See `infra/docker/kicad-cli/README.md` for worker payload examples (`type: run_e
 - Target KiCad 10 first; use documented S-expression parsing + `kicad-cli`, not deprecated SWIG bindings
 - PostgreSQL (+ pgvector later for evidence); no separate vector DB in MVP
 - Patches are reversible and branch-only
-- No routing / autonomous layout in MVP
+- No routing / autonomous layout in Phase A MVP (Phase B after gates; prompt-to-CAD is Phase C)

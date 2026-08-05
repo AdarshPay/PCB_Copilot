@@ -160,6 +160,7 @@ def run_first_pack_benchmark(fixtures_dir: Path) -> RunManifest:
     from tests.mutation.ir_mutators import (
         FIRST_PACK_RULE_IDS,
         mutate_duplicate_reference,
+        mutate_missing_footprint,
         mutate_missing_open_drain_pullup,
         mutate_missing_pin,
         mutate_missing_power_source,
@@ -173,7 +174,13 @@ def run_first_pack_benchmark(fixtures_dir: Path) -> RunManifest:
     cases: list[CaseResult] = []
     artifact_paths: list[Path] = []
 
-    for name in ("rc_divider.json", "i2c_sensor.json"):
+    clean_names = (
+        "rc_divider.json",
+        "i2c_sensor.json",
+        "ldo_rail.json",
+        "uart_bridge.json",
+    )
+    for name in clean_names:
         path = golden_dir / name
         artifact_paths.append(path)
         data = json.loads(path.read_text(encoding="utf-8"))
@@ -183,6 +190,7 @@ def run_first_pack_benchmark(fixtures_dir: Path) -> RunManifest:
         mutations = [
             ("duplicate_reference", mutate_duplicate_reference, "struct.unique_references"),
             ("missing_pin", mutate_missing_pin, "struct.pin_existence"),
+            ("missing_footprint", mutate_missing_footprint, "struct.footprint_presence"),
             ("output_conflict", mutate_output_conflict, "elec.output_conflict"),
             ("undriven_input", mutate_undriven_input, "elec.undriven_input"),
             ("missing_power_source", mutate_missing_power_source, "elec.power_source"),
