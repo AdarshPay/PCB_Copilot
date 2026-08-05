@@ -219,6 +219,21 @@ class Finding(Model):
     source: str = "deterministic"
 
 
+class NetFragment(Model):
+    """Net neighborhood snapshot for semantic review (before/after/current)."""
+
+    net_name: str
+    phase: str = Field(description="current | before | after")
+    endpoints: list[str] = Field(
+        default_factory=list,
+        description="Endpoint labels as component_ref.pin_number",
+    )
+    net_class: str | None = None
+    voltage_domain: str | None = None
+    protocol: str | None = None
+    related_finding_ids: list[str] = Field(default_factory=list)
+
+
 class ReviewReport(Model):
     """Machine-readable review artifact for a design revision."""
 
@@ -227,4 +242,6 @@ class ReviewReport(Model):
     design_revision: str
     findings: list[Finding] = Field(default_factory=list)
     operations: list[Operation] = Field(default_factory=list)
+    net_fragments: list[NetFragment] = Field(default_factory=list)
+    summary: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)

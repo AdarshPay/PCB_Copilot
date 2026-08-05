@@ -4,15 +4,12 @@ Verification-first KiCad copilot for schematic review and bounded schematic gene
 
 The circuit IR is the source of truth. Deterministic tools own syntax, graph integrity, and rule compliance. The LLM may propose typed operations but never mutates production CAD files directly. Human approval is required for electrical changes.
 
-## Current milestone (Sprint days 6–7)
+## Current milestone (Sprint day 10)
 
-- Containerized KiCad CLI image under `infra/docker/kicad-cli/`
-- Parse `kicad-cli sch erc` JSON/text reports into normalized `Finding` objects
-- Map ERC items back to schematic component UUIDs / references when possible
-- Worker job type `run_erc` (Redis queue); offline fixture path so pytest needs no Docker
-- Prior (days 3–5): lossless `.kicad_sch` parse/normalize/round-trip, CLI ingest, `POST /v1/ingest/schematic`
-
-Next (days 8–9): expand first deterministic rules + mutation tests per fault class.
+- Machine-readable `ReviewReport` with findings, net fragments, and summary
+- HTML semantic review report (`POST /v1/reviews/html`, CLI `--html`)
+- Reproducible first-pack benchmark run manifest (`python -m pcb_ai_benchmarks`)
+- Prior: KiCad ingest/round-trip, ERC normalization, first five deterministic rules + mutations
 
 Sprint exit criterion: ingest, normalize, check, round-trip, and report one real KiCad schematic **without** an LLM.
 
@@ -65,6 +62,12 @@ pytest
 
 # Export JSON Schema documents
 python scripts/export_schemas.py
+
+# HTML + JSON review from a schematic
+python -m pcb_ai_kicad_adapter tests/fixtures/kicad/rc_divider.kicad_sch --report --html reports/rc_divider.html -o reports/rc_divider.json
+
+# First-pack mutation benchmark manifest
+python -m pcb_ai_benchmarks -o reports/run-manifest.json
 ```
 
 ### Native ERC (optional Docker)

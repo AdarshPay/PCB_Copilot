@@ -5,6 +5,7 @@ description = "Deterministic schematic verification rule engine"
 requires-python = ">=3.12"
 dependencies = [
   "pcb-ai-circuit-ir",
+  "pcb-ai-transactions",
   "networkx>=3.4",
 ]
 

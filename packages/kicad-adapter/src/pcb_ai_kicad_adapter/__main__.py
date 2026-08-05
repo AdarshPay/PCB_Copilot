@@ -25,6 +25,17 @@ def main(argv: list[str] | None = None) -> int:
         help="Run deterministic verification rules after ingest",
     )
     parser.add_argument(
+        "--report",
+        action="store_true",
+        help="Emit a machine-readable ReviewReport JSON (implies rules)",
+    )
+    parser.add_argument(
+        "--html",
+        type=Path,
+        default=None,
+        help="Write an HTML semantic review report to this path (implies rules)",
+    )
+    parser.add_argument(
         "--emit",
         type=Path,
         default=None,
@@ -35,7 +46,7 @@ def main(argv: list[str] | None = None) -> int:
         "--output",
         type=Path,
         default=None,
-        help="Write Circuit IR JSON to this path (default: stdout)",
+        help="Write Circuit IR / report JSON to this path (default: stdout)",
     )
     args = parser.parse_args(argv)
 
@@ -43,16 +54,32 @@ def main(argv: list[str] | None = None) -> int:
     from pcb_ai_kicad_adapter.normalize import ingest_schematic
 
     design = ingest_schematic(args.schematic, design_id=args.design_id)
-    payload = design.model_dump(mode="json", by_alias=True)
 
-    if args.rules:
+    if args.report or args.html is not None:
+        from pcb_ai_verification import build_review_report, render_html_report
+
+        report = build_review_report(design)
+        if args.html is not None:
+            args.html.parent.mkdir(parents=True, exist_ok=True)
+            args.html.write_text(render_html_report(report, design), encoding="utf-8")
+        if args.report:
+            payload: dict = report.model_dump(mode="json", by_alias=True)
+        else:
+            payload = {
+                "design_id": design.id,
+                "finding_count": len(report.findings),
+                "html": str(args.html),
+            }
+    elif args.rules:
         from pcb_ai_verification import run_rules
 
         findings = run_rules(design)
         payload = {
-            "design": payload,
+            "design": design.model_dump(mode="json", by_alias=True),
             "findings": [f.model_dump(mode="json", by_alias=True) for f in findings],
         }
+    else:
+        payload = design.model_dump(mode="json", by_alias=True)
 
     text = json.dumps(payload, indent=2)
     if args.output:

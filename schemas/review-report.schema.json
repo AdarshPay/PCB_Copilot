@@ -137,6 +137,78 @@
       "title": "Finding",
       "type": "object"
     },
+    "NetFragment": {
+      "additionalProperties": false,
+      "description": "Net neighborhood snapshot for semantic review (before/after/current).",
+      "properties": {
+        "net_name": {
+          "title": "Net Name",
+          "type": "string"
+        },
+        "phase": {
+          "description": "current | before | after",
+          "title": "Phase",
+          "type": "string"
+        },
+        "endpoints": {
+          "description": "Endpoint labels as component_ref.pin_number",
+          "items": {
+            "type": "string"
+          },
+          "title": "Endpoints",
+          "type": "array"
+        },
+        "net_class": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Net Class"
+        },
+        "voltage_domain": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Voltage Domain"
+        },
+        "protocol": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Protocol"
+        },
+        "related_finding_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Related Finding Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "net_name",
+        "phase"
+      ],
+      "title": "NetFragment",
+      "type": "object"
+    },
     "Operation": {
       "additionalProperties": false,
       "description": "Typed, reversible edit proposal. Never applied directly to production CAD.",
@@ -260,6 +332,18 @@
       },
       "title": "Operations",
       "type": "array"
+    },
+    "net_fragments": {
+      "items": {
+        "$ref": "#/$defs/NetFragment"
+      },
+      "title": "Net Fragments",
+      "type": "array"
+    },
+    "summary": {
+      "additionalProperties": true,
+      "title": "Summary",
+      "type": "object"
     },
     "metadata": {
       "additionalProperties": true,

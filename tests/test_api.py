@@ -27,6 +27,8 @@ def test_create_review_output_conflict() -> None:
     body = response.json()
     assert body["design_id"] == design.id
     assert any(f["rule_id"] == "elec.output_conflict" for f in body["findings"])
+    assert body["summary"]["finding_count"] >= 1
+    assert body["net_fragments"]
 
 
 def test_ingest_schematic() -> None:
