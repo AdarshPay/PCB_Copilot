@@ -44,3 +44,32 @@ def test_ingest_schematic() -> None:
     refs = {c["reference"] for c in body["design"]["components"]}
     assert {"R1", "R2"} <= refs
     assert body["report"] is not None
+
+
+def test_propose_disabled_returns_403() -> None:
+    design = load_golden("output_conflict.json")
+    response = client.post(
+        "/v1/proposals",
+        json={"design": design.model_dump(mode="json", by_alias=True), "enabled": False},
+    )
+    assert response.status_code == 403
+
+
+def test_propose_apply_on_copy() -> None:
+    from tests.mutation.ir_mutators import mutate_missing_open_drain_pullup
+
+    design = mutate_missing_open_drain_pullup(load_golden("i2c_sensor.json"))
+    response = client.post(
+        "/v1/proposals",
+        json={
+            "design": design.model_dump(mode="json", by_alias=True),
+            "enabled": True,
+            "apply_on_copy": True,
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["operations"]
+    assert body["after_design"] is not None
+    assert body["branch_diff"]["production_mutation"] is False
+    assert any(op["type"] == "add_component" for op in body["operations"])

@@ -1,0 +1,213 @@
+{
+  "id": "fixture.esd_connector",
+  "source_tool": "synthetic",
+  "source_version": "fixture-0.1",
+  "revision": "1",
+  "name": "External connector with ESD protection",
+  "requirements": [
+    {
+      "id": "req.esd_io",
+      "text": "External IO connector routes through a TVS diode to the MCU GPIO.",
+      "priority": "must"
+    }
+  ],
+  "blocks": [
+    {
+      "id": "blk.mcu",
+      "name": "MCU",
+      "component_refs": ["U1"]
+    },
+    {
+      "id": "blk.io",
+      "name": "Protected IO",
+      "component_refs": ["J1", "D1", "R1"]
+    }
+  ],
+  "components": [
+    {
+      "reference": "U1",
+      "manufacturer_part_number": "RP2040",
+      "value": "RP2040",
+      "functional_class": "mcu",
+      "symbol_ref": "MCU_RaspberryPi:RP2040",
+      "footprint_ref": "Package_DFN_QFN:QFN-56-1EP_7x7mm_P0.4mm",
+      "pins": [
+        {
+          "number": "1",
+          "name": "GPIO0",
+          "electrical_role": "digital_bidir",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "2",
+          "name": "VDD",
+          "electrical_role": "power_in",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "3",
+          "name": "GND",
+          "electrical_role": "ground",
+          "voltage_domain": "GND"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000071"
+    },
+    {
+      "reference": "J1",
+      "manufacturer_part_number": "HDR-1x2",
+      "value": "IO",
+      "functional_class": "connector",
+      "symbol_ref": "Connector:Conn_01x02",
+      "footprint_ref": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+      "pins": [
+        {
+          "number": "1",
+          "name": "IO",
+          "electrical_role": "digital_bidir",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "2",
+          "name": "GND",
+          "electrical_role": "ground",
+          "voltage_domain": "GND"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000072"
+    },
+    {
+      "reference": "D1",
+      "manufacturer_part_number": "PESD5V0S1BA",
+      "value": "PESD5V0S1BA",
+      "functional_class": "protection",
+      "symbol_ref": "Device:D_TVS",
+      "footprint_ref": "Diode_SMD:D_SOD-323",
+      "pins": [
+        {
+          "number": "1",
+          "name": "A",
+          "electrical_role": "passive"
+        },
+        {
+          "number": "2",
+          "name": "K",
+          "electrical_role": "passive"
+        }
+      ],
+      "attributes": {
+        "role": "esd_tvs"
+      },
+      "uuid": "00000000-0000-4000-8000-000000000073"
+    },
+    {
+      "reference": "R1",
+      "value": "22",
+      "functional_class": "passive",
+      "symbol_ref": "Device:R",
+      "footprint_ref": "Resistor_SMD:R_0603_1608Metric",
+      "pins": [
+        {
+          "number": "1",
+          "name": "1",
+          "electrical_role": "passive"
+        },
+        {
+          "number": "2",
+          "name": "2",
+          "electrical_role": "passive"
+        }
+      ],
+      "attributes": {
+        "role": "series_protection"
+      },
+      "uuid": "00000000-0000-4000-8000-000000000074"
+    }
+  ],
+  "nets": [
+    {
+      "name": "3V3",
+      "class": "power",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "2"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000111"
+    },
+    {
+      "name": "GND",
+      "class": "ground",
+      "voltage_domain": "GND",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "3"
+        },
+        {
+          "component_ref": "J1",
+          "pin_number": "2"
+        },
+        {
+          "component_ref": "D1",
+          "pin_number": "1"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000112"
+    },
+    {
+      "name": "EXT_IO",
+      "class": "signal",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "J1",
+          "pin_number": "1"
+        },
+        {
+          "component_ref": "D1",
+          "pin_number": "2"
+        },
+        {
+          "component_ref": "R1",
+          "pin_number": "1"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000113"
+    },
+    {
+      "name": "MCU_IO",
+      "class": "signal",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "R1",
+          "pin_number": "2"
+        },
+        {
+          "component_ref": "U1",
+          "pin_number": "1"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000114"
+    }
+  ],
+  "assertions": [
+    {
+      "id": "assert.esd_path",
+      "kind": "protection",
+      "expression": "External IO has TVS to GND and series resistance to MCU",
+      "severity": "warning"
+    }
+  ],
+  "evidence_refs": [
+    {
+      "id": "fixture:esd_connector",
+      "kind": "fixture",
+      "title": "Golden ESD + connector",
+      "confidence": 1.0
+    }
+  ]
+}

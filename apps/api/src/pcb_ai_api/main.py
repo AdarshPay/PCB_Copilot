@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from pcb_ai_api.routes import health, ingest, reviews
+from pcb_ai_api.routes import health, ingest, proposals, reviews
 from pcb_ai_api.settings import settings
 
 app = FastAPI(
@@ -24,4 +24,5 @@ app.add_middleware(
 
 app.include_router(health.router)
 app.include_router(reviews.router, prefix="/v1")
+app.include_router(proposals.router, prefix="/v1")
 app.include_router(ingest.router, prefix="/v1")

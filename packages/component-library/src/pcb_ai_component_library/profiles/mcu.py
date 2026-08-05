@@ -1,0 +1,207 @@
+"""MCU family profiles (RP2040 / STM32)."""
+
+from __future__ import annotations
+
+from pcb_ai_circuit_ir.models import Constraint, ElectricalRole, EvidenceRef, FunctionalClass, Pin
+
+from pcb_ai_component_library.models import ComponentProfile
+
+PROFILES: list[ComponentProfile] = [
+    ComponentProfile(
+        manufacturer="Raspberry Pi Ltd",
+        orderable_mpn="RP2040",
+        functional_class=FunctionalClass.MCU,
+        symbol_ref="MCU_RaspberryPi:RP2040",
+        footprint_ref="Package_DFN_QFN:QFN-56-1EP_7x7mm_P0.4mm",
+        pins=[
+            Pin(number="44", name="IOVDD", electrical_role=ElectricalRole.POWER_IN, voltage_domain="3V3"),
+            Pin(number="23", name="DVDD", electrical_role=ElectricalRole.POWER_IN, voltage_domain="1V1"),
+            Pin(number="48", name="USB_VDD", electrical_role=ElectricalRole.POWER_IN, voltage_domain="3V3"),
+            Pin(number="43", name="ADC_AVDD", electrical_role=ElectricalRole.POWER_IN, voltage_domain="3V3"),
+            Pin(number="45", name="GND", electrical_role=ElectricalRole.GROUND, voltage_domain="GND"),
+            Pin(number="57", name="PAD", electrical_role=ElectricalRole.GROUND, voltage_domain="GND"),
+            Pin(number="26", name="RUN", electrical_role=ElectricalRole.RESET, voltage_domain="3V3"),
+            Pin(number="27", name="QSPI_SSn", electrical_role=ElectricalRole.DIGITAL_OUT, interface_role="qspi_cs", voltage_domain="3V3"),
+            Pin(number="32", name="QSPI_SCLK", electrical_role=ElectricalRole.CLOCK, interface_role="qspi_sck", voltage_domain="3V3"),
+            Pin(number="49", name="USB_DM", electrical_role=ElectricalRole.DIGITAL_BIDIR, interface_role="usb_dm", voltage_domain="3V3"),
+            Pin(number="50", name="USB_DP", electrical_role=ElectricalRole.DIGITAL_BIDIR, interface_role="usb_dp", voltage_domain="3V3"),
+            Pin(number="XIN", name="XIN", electrical_role=ElectricalRole.CLOCK, interface_role="xtal_in", voltage_domain="1V1"),
+            Pin(number="XOUT", name="XOUT", electrical_role=ElectricalRole.CLOCK, interface_role="xtal_out", voltage_domain="1V1"),
+            Pin(
+                number="1",
+                name="GPIO0",
+                electrical_role=ElectricalRole.DIGITAL_BIDIR,
+                interface_role="uart0_tx",
+                voltage_domain="3V3",
+            ),
+            Pin(
+                number="2",
+                name="GPIO1",
+                electrical_role=ElectricalRole.DIGITAL_BIDIR,
+                interface_role="uart0_rx",
+                voltage_domain="3V3",
+            ),
+            Pin(
+                number="11",
+                name="GPIO10",
+                electrical_role=ElectricalRole.OPEN_DRAIN,
+                interface_role="i2c1_sda",
+                voltage_domain="3V3",
+            ),
+            Pin(
+                number="12",
+                name="GPIO11",
+                electrical_role=ElectricalRole.OPEN_DRAIN,
+                interface_role="i2c1_scl",
+                voltage_domain="3V3",
+            ),
+        ],
+        absolute_maximum=[
+            Constraint(name="io_voltage", operator="lte", value=3.63, unit="V", notes="IOVDD absolute max"),
+            Constraint(name="storage_temp", operator="between", value=[-40, 125], unit="C"),
+        ],
+        recommended_operating=[
+            Constraint(name="iovdd", operator="between", value=[1.8, 3.3], unit="V"),
+            Constraint(name="dvdd", operator="eq", value=1.1, unit="V"),
+            Constraint(name="ambient_temp", operator="between", value=[-40, 85], unit="C"),
+        ],
+        supply_domains=["3V3", "1V1", "GND"],
+        required_support_components=[
+            "decoupling_100nF_per_iovdd",
+            "decoupling_100nF_dvdd",
+            "external_qspi_flash_w25q16",
+            "12mhz_crystal_with_load_caps",
+        ],
+        recommended_support_components=["bulk_4u7_3v3", "usb_series_resistors_27R"],
+        boot_reset_config=[
+            "RUN must be held high for normal operation; pulse low to reset",
+            "QSPI flash must contain valid second-stage bootloader",
+        ],
+        interface_characteristics={
+            "gpio_logic": "CMOS rail-to-rail vs IOVDD",
+            "usb": "USB 1.1 device PHY, full-speed",
+            "i2c": "open-drain; external pull-ups required",
+        },
+        approved_reference_circuits=["raspberrypi:pico_schematic_r3"],
+        simulation_model_refs=[],
+        evidence_refs=[
+            EvidenceRef(
+                id="ds:rp2040",
+                kind="datasheet",
+                title="RP2040 Datasheet",
+                uri="https://datasheets.raspberrypi.com/rp2040/rp2040-datasheet.pdf",
+                page=1,
+                confidence=0.85,
+            ),
+            EvidenceRef(
+                id="fixture:i2c_sensor",
+                kind="fixture",
+                title="Golden MCU + I2C sensor uses RP2040",
+                confidence=1.0,
+            ),
+        ],
+    ),
+    ComponentProfile(
+        manufacturer="STMicroelectronics",
+        orderable_mpn="STM32F103C8T6",
+        functional_class=FunctionalClass.MCU,
+        symbol_ref="MCU_ST_STM32F1:STM32F103C8Tx",
+        footprint_ref="Package_QFP:LQFP-48_7x7mm_P0.5mm",
+        pins=[
+            Pin(number="9", name="VDD_1", electrical_role=ElectricalRole.POWER_IN, voltage_domain="3V3"),
+            Pin(number="24", name="VDD_2", electrical_role=ElectricalRole.POWER_IN, voltage_domain="3V3"),
+            Pin(number="36", name="VDD_3", electrical_role=ElectricalRole.POWER_IN, voltage_domain="3V3"),
+            Pin(number="48", name="VDD_4", electrical_role=ElectricalRole.POWER_IN, voltage_domain="3V3"),
+            Pin(number="8", name="VSS_1", electrical_role=ElectricalRole.GROUND, voltage_domain="GND"),
+            Pin(number="23", name="VSS_2", electrical_role=ElectricalRole.GROUND, voltage_domain="GND"),
+            Pin(number="35", name="VSS_3", electrical_role=ElectricalRole.GROUND, voltage_domain="GND"),
+            Pin(number="47", name="VSS_4", electrical_role=ElectricalRole.GROUND, voltage_domain="GND"),
+            Pin(number="1", name="VBAT", electrical_role=ElectricalRole.POWER_IN, voltage_domain="3V3"),
+            Pin(number="13", name="VDDA", electrical_role=ElectricalRole.POWER_IN, voltage_domain="3V3"),
+            Pin(number="12", name="VSSA", electrical_role=ElectricalRole.GROUND, voltage_domain="GND"),
+            Pin(number="7", name="NRST", electrical_role=ElectricalRole.RESET, voltage_domain="3V3"),
+            Pin(number="44", name="BOOT0", electrical_role=ElectricalRole.BOOT, voltage_domain="3V3"),
+            Pin(number="5", name="PD0-OSC_IN", electrical_role=ElectricalRole.CLOCK, interface_role="xtal_in", voltage_domain="3V3"),
+            Pin(number="6", name="PD1-OSC_OUT", electrical_role=ElectricalRole.CLOCK, interface_role="xtal_out", voltage_domain="3V3"),
+            Pin(
+                number="30",
+                name="PA9",
+                electrical_role=ElectricalRole.DIGITAL_BIDIR,
+                interface_role="usart1_tx",
+                voltage_domain="3V3",
+            ),
+            Pin(
+                number="31",
+                name="PA10",
+                electrical_role=ElectricalRole.DIGITAL_BIDIR,
+                interface_role="usart1_rx",
+                voltage_domain="3V3",
+            ),
+            Pin(
+                number="42",
+                name="PB6",
+                electrical_role=ElectricalRole.OPEN_DRAIN,
+                interface_role="i2c1_scl",
+                voltage_domain="3V3",
+            ),
+            Pin(
+                number="43",
+                name="PB7",
+                electrical_role=ElectricalRole.OPEN_DRAIN,
+                interface_role="i2c1_sda",
+                voltage_domain="3V3",
+            ),
+            Pin(
+                number="32",
+                name="PA11",
+                electrical_role=ElectricalRole.DIGITAL_BIDIR,
+                interface_role="usb_dm",
+                voltage_domain="3V3",
+            ),
+            Pin(
+                number="33",
+                name="PA12",
+                electrical_role=ElectricalRole.DIGITAL_BIDIR,
+                interface_role="usb_dp",
+                voltage_domain="3V3",
+            ),
+        ],
+        absolute_maximum=[
+            Constraint(name="vdd", operator="lte", value=4.0, unit="V"),
+            Constraint(name="injection_current", operator="lte", value=5, unit="mA"),
+        ],
+        recommended_operating=[
+            Constraint(name="vdd", operator="between", value=[2.0, 3.6], unit="V"),
+            Constraint(name="ambient_temp", operator="between", value=[-40, 85], unit="C"),
+        ],
+        supply_domains=["3V3", "VDDA", "VBAT", "GND"],
+        required_support_components=[
+            "decoupling_100nF_each_vdd",
+            "decoupling_1uF_vdda",
+            "nrst_pullup_10k_and_cap",
+            "boot0_pulldown_10k",
+        ],
+        recommended_support_components=["8mhz_hse_crystal", "32.768khz_lse_crystal"],
+        boot_reset_config=[
+            "BOOT0=0 for main flash boot",
+            "NRST active-low; external RC recommended",
+        ],
+        interface_characteristics={
+            "gpio_logic": "CMOS vs VDD",
+            "usb": "USB 2.0 FS device",
+            "i2c": "open-drain SMBus-capable",
+        },
+        approved_reference_circuits=["st:stm32f103_bluepill_ref"],
+        simulation_model_refs=[],
+        evidence_refs=[
+            EvidenceRef(
+                id="ds:stm32f103c8",
+                kind="datasheet",
+                title="STM32F103x8 Datasheet",
+                uri="https://www.st.com/resource/en/datasheet/stm32f103c8.pdf",
+                page=1,
+                confidence=0.85,
+            )
+        ],
+    ),
+]

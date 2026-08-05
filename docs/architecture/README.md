@@ -17,3 +17,10 @@ Phase A MVP architecture, Circuit IR, rule pack, and foundations → layout → 
 - Parser / mapper: `pcb_ai_verification.erc_parse` / `erc_map` → `Finding` with `source="kicad_erc"`
 - Runner: `pcb_ai_verification.erc_runner.run_schematic_erc` (local CLI, Docker, or fixture/mock)
 - Worker job: `type: "run_erc"` in `pcb_ai_worker`
+
+## KiCad hierarchy / UUID round-trip (Phase A research)
+
+- Ingest walks `(sheet …)` / `Sheetfile` children and sets `SourceLocation.sheet` to KiCad-style paths (`/`, `/{sheet-uuid}`, …).
+- Connectivity merges global/power labels across sheets and bridges parent sheet pins to child `hierarchical_label`s by name.
+- AST serialize preserves UUID atoms; `uuid_fingerprint` / `uuid_equal` assert component UUID survival through emit.
+- Fixture: `tests/fixtures/kicad/hierarchy/`. Emit remains a flat connectivity sketch (not a lossless hierarchy writer).

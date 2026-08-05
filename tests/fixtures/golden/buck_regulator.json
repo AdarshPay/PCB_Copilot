@@ -1,0 +1,232 @@
+{
+  "id": "fixture.buck_regulator",
+  "source_tool": "synthetic",
+  "source_version": "fixture-0.1",
+  "revision": "1",
+  "name": "Simple buck regulator rail",
+  "requirements": [
+    {
+      "id": "req.buck_rail",
+      "text": "AP63205 bucks VIN_12V to 3V3 with inductor and input/output capacitors.",
+      "priority": "must"
+    }
+  ],
+  "blocks": [
+    {
+      "id": "blk.power",
+      "name": "Buck power",
+      "component_refs": ["U1", "L1", "C1", "C2"]
+    }
+  ],
+  "components": [
+    {
+      "reference": "U1",
+      "manufacturer_part_number": "AP63205",
+      "value": "3.3V",
+      "functional_class": "regulator_buck",
+      "symbol_ref": "Regulator_Switching:AP63205",
+      "footprint_ref": "Package_TO_SOT_SMD:TSOT-23-6",
+      "pins": [
+        {
+          "number": "1",
+          "name": "VIN",
+          "electrical_role": "power_in",
+          "voltage_domain": "12V"
+        },
+        {
+          "number": "2",
+          "name": "GND",
+          "electrical_role": "ground",
+          "voltage_domain": "GND"
+        },
+        {
+          "number": "3",
+          "name": "EN",
+          "electrical_role": "enable",
+          "voltage_domain": "12V"
+        },
+        {
+          "number": "4",
+          "name": "FB",
+          "electrical_role": "analog_in",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "5",
+          "name": "SW",
+          "electrical_role": "power_out",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "6",
+          "name": "BOOT",
+          "electrical_role": "no_connect"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000081"
+    },
+    {
+      "reference": "L1",
+      "value": "2.2uH",
+      "functional_class": "passive",
+      "symbol_ref": "Device:L",
+      "footprint_ref": "Inductor_SMD:L_0805_2012Metric",
+      "pins": [
+        {
+          "number": "1",
+          "name": "1",
+          "electrical_role": "passive"
+        },
+        {
+          "number": "2",
+          "name": "2",
+          "electrical_role": "passive"
+        }
+      ],
+      "attributes": {
+        "role": "buck_inductor"
+      },
+      "uuid": "00000000-0000-4000-8000-000000000082"
+    },
+    {
+      "reference": "C1",
+      "value": "10uF",
+      "functional_class": "passive",
+      "symbol_ref": "Device:C",
+      "footprint_ref": "Capacitor_SMD:C_0805_2012Metric",
+      "pins": [
+        {
+          "number": "1",
+          "name": "1",
+          "electrical_role": "passive"
+        },
+        {
+          "number": "2",
+          "name": "2",
+          "electrical_role": "passive"
+        }
+      ],
+      "attributes": {
+        "role": "input_cap"
+      },
+      "uuid": "00000000-0000-4000-8000-000000000083"
+    },
+    {
+      "reference": "C2",
+      "value": "22uF",
+      "functional_class": "passive",
+      "symbol_ref": "Device:C",
+      "footprint_ref": "Capacitor_SMD:C_0805_2012Metric",
+      "pins": [
+        {
+          "number": "1",
+          "name": "1",
+          "electrical_role": "passive"
+        },
+        {
+          "number": "2",
+          "name": "2",
+          "electrical_role": "passive"
+        }
+      ],
+      "attributes": {
+        "role": "output_cap"
+      },
+      "uuid": "00000000-0000-4000-8000-000000000084"
+    }
+  ],
+  "nets": [
+    {
+      "name": "VIN_12V",
+      "class": "power",
+      "voltage_domain": "12V",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "1"
+        },
+        {
+          "component_ref": "U1",
+          "pin_number": "3"
+        },
+        {
+          "component_ref": "C1",
+          "pin_number": "1"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000121"
+    },
+    {
+      "name": "SW",
+      "class": "signal",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "5"
+        },
+        {
+          "component_ref": "L1",
+          "pin_number": "1"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000122"
+    },
+    {
+      "name": "3V3",
+      "class": "power",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "L1",
+          "pin_number": "2"
+        },
+        {
+          "component_ref": "U1",
+          "pin_number": "4"
+        },
+        {
+          "component_ref": "C2",
+          "pin_number": "1"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000123"
+    },
+    {
+      "name": "GND",
+      "class": "ground",
+      "voltage_domain": "GND",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "2"
+        },
+        {
+          "component_ref": "C1",
+          "pin_number": "2"
+        },
+        {
+          "component_ref": "C2",
+          "pin_number": "2"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000124"
+    }
+  ],
+  "assertions": [
+    {
+      "id": "assert.buck_lc",
+      "kind": "power",
+      "expression": "Buck has inductor from SW to 3V3 with local input and output caps",
+      "severity": "warning"
+    }
+  ],
+  "evidence_refs": [
+    {
+      "id": "fixture:buck_regulator",
+      "kind": "fixture",
+      "title": "Golden buck regulator",
+      "confidence": 1.0
+    }
+  ]
+}

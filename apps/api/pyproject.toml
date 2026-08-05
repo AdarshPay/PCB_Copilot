@@ -13,6 +13,7 @@ dependencies = [
   "pcb-ai-kicad-adapter",
   "pcb-ai-verification",
   "pcb-ai-transactions",
+  "pcb-ai-agent",
   "pcb-ai-evidence",
 ]
 

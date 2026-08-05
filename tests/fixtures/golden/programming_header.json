@@ -1,0 +1,247 @@
+{
+  "id": "fixture.programming_header",
+  "source_tool": "synthetic",
+  "source_version": "fixture-0.1",
+  "revision": "1",
+  "name": "SWD programming header plus MCU",
+  "requirements": [
+    {
+      "id": "req.swd_header",
+      "text": "10-pin SWD header exposes SWDIO/SWCLK/NRST to the MCU with NRST pull-up.",
+      "priority": "must"
+    }
+  ],
+  "blocks": [
+    {
+      "id": "blk.mcu",
+      "name": "MCU",
+      "component_refs": ["U1", "R1"]
+    },
+    {
+      "id": "blk.debug",
+      "name": "Programming",
+      "component_refs": ["J1"]
+    }
+  ],
+  "components": [
+    {
+      "reference": "U1",
+      "manufacturer_part_number": "STM32F103C8",
+      "value": "STM32F103C8",
+      "functional_class": "mcu",
+      "symbol_ref": "MCU_ST_STM32F1:STM32F103C8Tx",
+      "footprint_ref": "Package_QFP:LQFP-48_7x7mm_P0.5mm",
+      "pins": [
+        {
+          "number": "1",
+          "name": "PA13",
+          "electrical_role": "digital_bidir",
+          "interface_role": "swdio",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "2",
+          "name": "PA14",
+          "electrical_role": "digital_bidir",
+          "interface_role": "swclk",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "3",
+          "name": "NRST",
+          "electrical_role": "open_drain",
+          "interface_role": "reset",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "4",
+          "name": "VDD",
+          "electrical_role": "power_in",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "5",
+          "name": "GND",
+          "electrical_role": "ground",
+          "voltage_domain": "GND"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000091"
+    },
+    {
+      "reference": "J1",
+      "manufacturer_part_number": "HDR-2x05",
+      "value": "SWD",
+      "functional_class": "programming",
+      "symbol_ref": "Connector:Tag-Connect_TC2050",
+      "footprint_ref": "Connector:Tag-Connect_TC2050-IDC-NL_2x05_P1.27mm_Vertical",
+      "pins": [
+        {
+          "number": "1",
+          "name": "VTref",
+          "electrical_role": "power_in",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "2",
+          "name": "SWDIO",
+          "electrical_role": "digital_bidir",
+          "interface_role": "swdio",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "3",
+          "name": "GND",
+          "electrical_role": "ground",
+          "voltage_domain": "GND"
+        },
+        {
+          "number": "4",
+          "name": "SWCLK",
+          "electrical_role": "digital_bidir",
+          "interface_role": "swclk",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "5",
+          "name": "NRST",
+          "electrical_role": "digital_bidir",
+          "interface_role": "reset",
+          "voltage_domain": "3V3"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000092"
+    },
+    {
+      "reference": "R1",
+      "value": "10k",
+      "functional_class": "passive",
+      "symbol_ref": "Device:R",
+      "footprint_ref": "Resistor_SMD:R_0603_1608Metric",
+      "pins": [
+        {
+          "number": "1",
+          "name": "1",
+          "electrical_role": "passive"
+        },
+        {
+          "number": "2",
+          "name": "2",
+          "electrical_role": "passive"
+        }
+      ],
+      "attributes": {
+        "role": "nrst_pullup"
+      },
+      "uuid": "00000000-0000-4000-8000-000000000093"
+    }
+  ],
+  "nets": [
+    {
+      "name": "3V3",
+      "class": "power",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "4"
+        },
+        {
+          "component_ref": "J1",
+          "pin_number": "1"
+        },
+        {
+          "component_ref": "R1",
+          "pin_number": "1"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000131"
+    },
+    {
+      "name": "GND",
+      "class": "ground",
+      "voltage_domain": "GND",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "5"
+        },
+        {
+          "component_ref": "J1",
+          "pin_number": "3"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000132"
+    },
+    {
+      "name": "SWDIO",
+      "class": "signal",
+      "protocol": "swd",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "1"
+        },
+        {
+          "component_ref": "J1",
+          "pin_number": "2"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000133"
+    },
+    {
+      "name": "SWCLK",
+      "class": "signal",
+      "protocol": "swd",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "2"
+        },
+        {
+          "component_ref": "J1",
+          "pin_number": "4"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000134"
+    },
+    {
+      "name": "NRST",
+      "class": "signal",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "3"
+        },
+        {
+          "component_ref": "J1",
+          "pin_number": "5"
+        },
+        {
+          "component_ref": "R1",
+          "pin_number": "2"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000135"
+    }
+  ],
+  "assertions": [
+    {
+      "id": "assert.swd_header",
+      "kind": "interface",
+      "expression": "SWDIO/SWCLK/NRST reach programming header; NRST has pull-up to 3V3",
+      "severity": "error"
+    }
+  ],
+  "evidence_refs": [
+    {
+      "id": "fixture:programming_header",
+      "kind": "fixture",
+      "title": "Golden programming header + MCU",
+      "confidence": 1.0
+    }
+  ]
+}

@@ -32,3 +32,34 @@ def test_escaped_quotes_in_strings() -> None:
     ast = parse_schematic_sexpr(r'(property "Note" "say \"hi\"")')
     assert ast.atom_at(0) == "Note"
     assert ast.atom_at(1) == 'say "hi"'
+
+
+def test_parse_sheet_and_hierarchical_label() -> None:
+    src = """
+    (kicad_sch
+      (version 20250114)
+      (uuid "root-uuid")
+      (sheet
+        (at 0 0)
+        (size 10 10)
+        (uuid "sheet-uuid")
+        (property "Sheetname" "Child")
+        (property "Sheetfile" "child.kicad_sch")
+        (pin "SIG" input
+          (at 0 5 180)
+          (uuid "pin-uuid")
+        )
+      )
+      (hierarchical_label "SIG"
+        (at 1 5 0)
+        (uuid "hlab-uuid")
+      )
+    )
+    """
+    ast = parse_schematic_sexpr(src)
+    sheet = ast.find("sheet")
+    assert sheet is not None
+    assert sheet.find("uuid").atom_at(0) == "sheet-uuid"
+    assert sheet.find_all("property")[1].atom_at(1) == "child.kicad_sch"
+    assert sheet.find("pin").atom_at(0) == "SIG"
+    assert ast.find("hierarchical_label").atom_at(0) == "SIG"

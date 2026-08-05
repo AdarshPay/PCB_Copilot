@@ -1,0 +1,267 @@
+{
+  "id": "fixture.can_transceiver",
+  "source_tool": "synthetic",
+  "source_version": "fixture-0.1",
+  "revision": "1",
+  "name": "MCU plus CAN transceiver stub",
+  "requirements": [
+    {
+      "id": "req.can_stub",
+      "text": "TJA1051 bridges MCU CAN TX/RX to a differential CANH/CANL stub with termination.",
+      "priority": "must"
+    }
+  ],
+  "blocks": [
+    {
+      "id": "blk.mcu",
+      "name": "MCU",
+      "component_refs": ["U1"]
+    },
+    {
+      "id": "blk.can",
+      "name": "CAN",
+      "component_refs": ["U2", "R1"]
+    }
+  ],
+  "components": [
+    {
+      "reference": "U1",
+      "manufacturer_part_number": "RP2040",
+      "value": "RP2040",
+      "functional_class": "mcu",
+      "symbol_ref": "MCU_RaspberryPi:RP2040",
+      "footprint_ref": "Package_DFN_QFN:QFN-56-1EP_7x7mm_P0.4mm",
+      "pins": [
+        {
+          "number": "1",
+          "name": "GPIO0",
+          "electrical_role": "digital_out",
+          "interface_role": "can_tx",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "2",
+          "name": "GPIO1",
+          "electrical_role": "digital_in",
+          "interface_role": "can_rx",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "3",
+          "name": "VDD",
+          "electrical_role": "power_in",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "4",
+          "name": "GND",
+          "electrical_role": "ground",
+          "voltage_domain": "GND"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000051"
+    },
+    {
+      "reference": "U2",
+      "manufacturer_part_number": "TJA1051",
+      "value": "TJA1051",
+      "functional_class": "transceiver",
+      "symbol_ref": "Interface_CAN_LIN:TJA1051",
+      "footprint_ref": "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+      "pins": [
+        {
+          "number": "1",
+          "name": "TXD",
+          "electrical_role": "digital_in",
+          "interface_role": "can_tx",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "2",
+          "name": "RXD",
+          "electrical_role": "digital_out",
+          "interface_role": "can_rx",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "3",
+          "name": "CANH",
+          "electrical_role": "digital_bidir",
+          "interface_role": "can_h",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "4",
+          "name": "CANL",
+          "electrical_role": "digital_bidir",
+          "interface_role": "can_l",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "5",
+          "name": "VCC",
+          "electrical_role": "power_in",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "6",
+          "name": "GND",
+          "electrical_role": "ground",
+          "voltage_domain": "GND"
+        },
+        {
+          "number": "7",
+          "name": "S",
+          "electrical_role": "enable",
+          "voltage_domain": "GND"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000052"
+    },
+    {
+      "reference": "R1",
+      "value": "120",
+      "functional_class": "passive",
+      "symbol_ref": "Device:R",
+      "footprint_ref": "Resistor_SMD:R_0603_1608Metric",
+      "pins": [
+        {
+          "number": "1",
+          "name": "1",
+          "electrical_role": "passive"
+        },
+        {
+          "number": "2",
+          "name": "2",
+          "electrical_role": "passive"
+        }
+      ],
+      "attributes": {
+        "role": "can_termination"
+      },
+      "uuid": "00000000-0000-4000-8000-000000000053"
+    }
+  ],
+  "nets": [
+    {
+      "name": "3V3",
+      "class": "power",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "3"
+        },
+        {
+          "component_ref": "U2",
+          "pin_number": "5"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000f1"
+    },
+    {
+      "name": "GND",
+      "class": "ground",
+      "voltage_domain": "GND",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "4"
+        },
+        {
+          "component_ref": "U2",
+          "pin_number": "6"
+        },
+        {
+          "component_ref": "U2",
+          "pin_number": "7"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000f2"
+    },
+    {
+      "name": "CAN_TX",
+      "class": "signal",
+      "protocol": "can",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "1"
+        },
+        {
+          "component_ref": "U2",
+          "pin_number": "1"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000f3"
+    },
+    {
+      "name": "CAN_RX",
+      "class": "signal",
+      "protocol": "can",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U2",
+          "pin_number": "2"
+        },
+        {
+          "component_ref": "U1",
+          "pin_number": "2"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000f4"
+    },
+    {
+      "name": "CANH",
+      "class": "differential",
+      "protocol": "can",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U2",
+          "pin_number": "3"
+        },
+        {
+          "component_ref": "R1",
+          "pin_number": "1"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000f5"
+    },
+    {
+      "name": "CANL",
+      "class": "differential",
+      "protocol": "can",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U2",
+          "pin_number": "4"
+        },
+        {
+          "component_ref": "R1",
+          "pin_number": "2"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000f6"
+    }
+  ],
+  "assertions": [
+    {
+      "id": "assert.can_cross",
+      "kind": "interface",
+      "expression": "MCU TX drives transceiver TXD; transceiver RXD drives MCU RX",
+      "severity": "error"
+    }
+  ],
+  "evidence_refs": [
+    {
+      "id": "fixture:can_transceiver",
+      "kind": "fixture",
+      "title": "Golden CAN transceiver stub",
+      "confidence": 1.0
+    }
+  ]
+}

@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
   "pcb-ai-circuit-ir",
   "pcb-ai-transactions",
+  "pcb-ai-evidence",
   "networkx>=3.4",
 ]
 

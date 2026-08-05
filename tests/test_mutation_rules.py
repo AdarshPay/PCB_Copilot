@@ -24,6 +24,11 @@ CLEAN_GOLDENS = (
     "i2c_sensor.json",
     "ldo_rail.json",
     "uart_bridge.json",
+    "can_transceiver.json",
+    "rs485_link.json",
+    "esd_connector.json",
+    "buck_regulator.json",
+    "programming_header.json",
 )
 
 
@@ -65,7 +70,17 @@ def test_clean_goldens_have_no_first_pack_findings(name: str) -> None:
 @pytest.mark.parametrize(
     "base",
     CLEAN_GOLDENS,
-    ids=["rc_divider", "i2c_sensor", "ldo_rail", "uart_bridge"],
+    ids=[
+        "rc_divider",
+        "i2c_sensor",
+        "ldo_rail",
+        "uart_bridge",
+        "can_transceiver",
+        "rs485_link",
+        "esd_connector",
+        "buck_regulator",
+        "programming_header",
+    ],
 )
 def test_single_fault_fires_expected_rule(mutator, expected_rule: str, base: str) -> None:
     clean = load_golden(base)

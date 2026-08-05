@@ -3,9 +3,17 @@
 from pcb_ai_kicad_adapter.emit import emit_schematic_ast, emit_schematic_text
 from pcb_ai_kicad_adapter.normalize import ingest_schematic, normalize_to_circuit_ir
 from pcb_ai_kicad_adapter.parser import dump_schematic_sexpr, parse_schematic_sexpr, serialize_sexpr
-from pcb_ai_kicad_adapter.semantic import semantic_diff, semantic_equal, semantic_fingerprint
+from pcb_ai_kicad_adapter.semantic import (
+    collect_ast_uuids,
+    semantic_diff,
+    semantic_equal,
+    semantic_fingerprint,
+    uuid_equal,
+    uuid_fingerprint,
+)
 
 __all__ = [
+    "collect_ast_uuids",
     "dump_schematic_sexpr",
     "emit_schematic_ast",
     "emit_schematic_text",
@@ -16,4 +24,6 @@ __all__ = [
     "semantic_equal",
     "semantic_fingerprint",
     "serialize_sexpr",
+    "uuid_equal",
+    "uuid_fingerprint",
 ]

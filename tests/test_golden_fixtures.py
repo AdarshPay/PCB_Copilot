@@ -32,6 +32,11 @@ def test_clean_and_conflict_goldens_exist() -> None:
         "output_conflict",
         "ldo_rail",
         "uart_bridge",
+        "can_transceiver",
+        "rs485_link",
+        "esd_connector",
+        "buck_regulator",
+        "programming_header",
     }
 
 

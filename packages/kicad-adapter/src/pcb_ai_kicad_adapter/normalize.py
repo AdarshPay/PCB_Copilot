@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import math
 import re
+from dataclasses import dataclass, field
 from pathlib import Path
 from uuid import uuid5, UUID
 
 from pcb_ai_circuit_ir.models import (
+    Block,
     Component,
     Design,
     ElectricalRole,
@@ -26,10 +28,49 @@ from pcb_ai_kicad_adapter.connectivity import (
     Point,
     qpoint,
 )
+from pcb_ai_kicad_adapter.hierarchy import (
+    SheetRef,
+    child_sheet_path,
+    extract_sheet_refs,
+    resolve_child_path,
+    symbol_instance_sheet_path,
+)
 from pcb_ai_kicad_adapter.parser import SExprNode, parse_schematic_sexpr
 
 # Stable namespace for deterministic net UUIDs derived from schematic content.
 _NET_NS = UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+
+
+@dataclass
+class _SheetNetFragment:
+    """One geometric net group on a single sheet, before hierarchy merge."""
+
+    sheet_path: str
+    endpoints: list[Endpoint]
+    labels: list[LabelAttachment]
+    name_hint: str | None = None
+
+
+@dataclass
+class _HierarchyBridge:
+    """Links a parent sheet pin net to a child hierarchical_label net by name."""
+
+    parent_sheet_path: str
+    child_sheet_path: str
+    pin_name: str
+
+
+@dataclass
+class _SheetNormalizeResult:
+    sheet_path: str
+    sheet_uuid: str | None
+    sheet_name: str | None
+    file_path: str | None
+    version: str | None
+    title: str | None
+    components: list[Component] = field(default_factory=list)
+    fragments: list[_SheetNetFragment] = field(default_factory=list)
+    sheet_refs: list[SheetRef] = field(default_factory=list)
 
 
 class NormalizationError(ValueError):
@@ -65,16 +106,29 @@ _REF_CLASS: list[tuple[re.Pattern[str], FunctionalClass]] = [
 ]
 
 
-def normalize_to_circuit_ir(ast: SExprNode | Design, *, design_id: str | None = None) -> Design:
+def normalize_to_circuit_ir(
+    ast: SExprNode | Design,
+    *,
+    design_id: str | None = None,
+    sheet_path: str = "/",
+    file_path: str | Path | None = None,
+) -> Design:
     """Convert a parsed schematic AST into a typed Design.
 
     If a Design is passed through (e.g. golden fixtures), it is returned as-is.
+    Single-sheet ASTs are normalized with `sheet_path` (default `/`).
+    Prefer `ingest_schematic` for on-disk projects so child sheets are loaded.
     """
     if isinstance(ast, Design):
         return ast
     if ast.head != "kicad_sch":
         raise NormalizationError(f"Expected kicad_sch root, got {ast.head!r}")
-    return _normalize_schematic(ast, design_id=design_id)
+    result = _normalize_sheet(
+        ast,
+        sheet_path=sheet_path,
+        file_path=str(file_path) if file_path is not None else None,
+    )
+    return _design_from_sheets([result], bridges=[], design_id=design_id)
 
 
 def ingest_schematic(
@@ -82,37 +136,80 @@ def ingest_schematic(
     *,
     design_id: str | None = None,
 ) -> Design:
-    """Parse a `.kicad_sch` path or text and normalize to Circuit IR."""
+    """Parse a `.kicad_sch` path or text and normalize to Circuit IR.
+
+    When `source` is an on-disk schematic, child sheets referenced by `(sheet …)`
+    / Sheetfile are loaded recursively and merged (global labels, power nets,
+    and hierarchical sheet-pin ↔ hierarchical_label bridges).
+    """
     path: Path | None = None
     if isinstance(source, Path):
         path = source
-        ast = parse_schematic_sexpr(source)
         default_id = design_id or f"kicad.{source.stem}"
     elif isinstance(source, str) and "\n" not in source and source.endswith(".kicad_sch"):
-        path = Path(source)
-        if path.is_file():
-            ast = parse_schematic_sexpr(path)
-            default_id = design_id or f"kicad.{path.stem}"
+        candidate = Path(source)
+        if candidate.is_file():
+            path = candidate
+            default_id = design_id or f"kicad.{candidate.stem}"
         else:
             ast = parse_schematic_sexpr(source)
-            default_id = design_id or "kicad.inline"
+            return normalize_to_circuit_ir(ast, design_id=design_id or "kicad.inline")
     else:
         ast = parse_schematic_sexpr(source)
-        default_id = design_id or "kicad.inline"
-    design = normalize_to_circuit_ir(ast, design_id=default_id)
-    if path is not None:
-        for component in design.components:
-            if component.source_location is None:
-                component.source_location = SourceLocation(path=str(path))
-            elif component.source_location.path is None:
-                component.source_location.path = str(path)
-    return design
+        return normalize_to_circuit_ir(ast, design_id=design_id or "kicad.inline")
+
+    assert path is not None
+    return _ingest_hierarchy(path.resolve(), design_id=default_id)
 
 
-def _normalize_schematic(root: SExprNode, *, design_id: str | None) -> Design:
+def _ingest_hierarchy(root_path: Path, *, design_id: str) -> Design:
+    sheets: list[_SheetNormalizeResult] = []
+    bridges: list[_HierarchyBridge] = []
+    visited_files: set[Path] = set()
+
+    def visit(file_path: Path, sheet_path: str) -> _SheetNormalizeResult:
+        resolved = file_path.resolve()
+        if resolved in visited_files:
+            raise NormalizationError(
+                f"Sheet file cycle or reuse not supported yet: {resolved}"
+            )
+        visited_files.add(resolved)
+        ast = parse_schematic_sexpr(resolved)
+        result = _normalize_sheet(ast, sheet_path=sheet_path, file_path=str(resolved))
+        sheets.append(result)
+        for ref in result.sheet_refs:
+            child_path = child_sheet_path(sheet_path, ref.uuid)
+            child_file = resolve_child_path(resolved, ref.filename)
+            if not child_file.is_file():
+                raise NormalizationError(
+                    f"Missing child schematic {ref.filename!r} "
+                    f"(resolved {child_file}) referenced from {resolved}"
+                )
+            for pin_name in ref.pin_names:
+                bridges.append(
+                    _HierarchyBridge(
+                        parent_sheet_path=sheet_path,
+                        child_sheet_path=child_path,
+                        pin_name=pin_name,
+                    )
+                )
+            visit(child_file, child_path)
+        return result
+
+    visit(root_path, "/")
+    return _design_from_sheets(sheets, bridges=bridges, design_id=design_id)
+
+
+def _normalize_sheet(
+    root: SExprNode,
+    *,
+    sheet_path: str,
+    file_path: str | None,
+) -> _SheetNormalizeResult:
     version = _first_atom(root.find("version"))
     sheet_uuid = _first_atom(root.find("uuid"))
     title = _title_block_name(root)
+    sheet_refs = extract_sheet_refs(root)
 
     lib_pins = _index_lib_symbol_pins(root.find("lib_symbols"))
     components: list[Component] = []
@@ -123,7 +220,12 @@ def _normalize_schematic(root: SExprNode, *, design_id: str | None) -> Design:
         # Skip nested library definitions accidentally present under root.
         if sym.find("lib_id") is None and sym.find("pin") is None:
             continue
-        component, attachments = _symbol_instance_to_component(sym, lib_pins)
+        component, attachments = _symbol_instance_to_component(
+            sym,
+            lib_pins,
+            sheet_path=sheet_path,
+            file_path=file_path,
+        )
         if component is None:
             continue
         components.append(component)
@@ -196,6 +298,19 @@ def _normalize_schematic(root: SExprNode, *, design_id: str | None) -> Design:
                     )
                 )
 
+    # Sheet pins on the parent: attach hierarchical labels at pin coordinates
+    # so parent-side wiring joins the bridge by pin name.
+    for ref in sheet_refs:
+        for pin_name, (px, py) in ref.pin_points.items():
+            graph.add_label(
+                LabelAttachment(
+                    name=pin_name,
+                    point=qpoint(px, py),
+                    scope="hierarchical",
+                    uuid=ref.pin_uuids.get(pin_name),
+                )
+            )
+
     # Power-symbol net naming: Value property is the global net name.
     for component, attachments in instance_pin_points:
         if component.reference.startswith("#PWR") or component.attributes.get("power_symbol"):
@@ -210,37 +325,12 @@ def _normalize_schematic(root: SExprNode, *, design_id: str | None) -> Design:
                     )
                 )
 
-    nets = _build_nets(graph, design_id=design_id or sheet_uuid or "kicad")
-
-    return Design(
-        id=design_id or (f"kicad.{sheet_uuid}" if sheet_uuid else "kicad.unknown"),
-        source_tool=SourceTool.KICAD,
-        source_version=version,
-        revision="0",
-        name=title,
-        components=components,
-        nets=nets,
-    )
-
-
-def _build_nets(graph: ConnectivityGraph, *, design_id: str) -> list[Net]:
-    nets: list[Net] = []
-    anonymous_i = 0
+    fragments: list[_SheetNetFragment] = []
     for group in graph.net_groups():
         pins: list[PinAttachment] = group["pins"]
         labels: list[LabelAttachment] = group["labels"]
         if not pins and not labels:
             continue
-
-        name = _choose_net_name(labels, pins)
-        if name is None:
-            anonymous_i += 1
-            if pins:
-                p0 = pins[0]
-                name = f"Net-({p0.component_ref}-Pad{p0.pin_number})"
-            else:
-                name = f"Net-{anonymous_i}"
-
         endpoints = [
             Endpoint(
                 component_ref=p.component_ref,
@@ -249,7 +339,6 @@ def _build_nets(graph: ConnectivityGraph, *, design_id: str) -> list[Net]:
             )
             for p in sorted(pins, key=lambda p: (p.component_ref, p.pin_number))
         ]
-        # Deduplicate endpoints
         seen: set[tuple[str, str]] = set()
         uniq: list[Endpoint] = []
         for ep in endpoints:
@@ -258,14 +347,165 @@ def _build_nets(graph: ConnectivityGraph, *, design_id: str) -> list[Net]:
                 continue
             seen.add(key)
             uniq.append(ep)
+        fragments.append(
+            _SheetNetFragment(
+                sheet_path=sheet_path,
+                endpoints=uniq,
+                labels=list(labels),
+                name_hint=_choose_net_name(labels, pins),
+            )
+        )
 
-        net_class = _infer_net_class(name, labels)
-        uuid_seed = f"{design_id}:{name}:" + ",".join(f"{e.component_ref}.{e.pin_number}" for e in uniq)
+    return _SheetNormalizeResult(
+        sheet_path=sheet_path,
+        sheet_uuid=sheet_uuid,
+        sheet_name=title,
+        file_path=file_path,
+        version=version,
+        title=title,
+        components=components,
+        fragments=fragments,
+        sheet_refs=sheet_refs,
+    )
+
+
+def _design_from_sheets(
+    sheets: list[_SheetNormalizeResult],
+    *,
+    bridges: list[_HierarchyBridge],
+    design_id: str | None,
+) -> Design:
+    if not sheets:
+        raise NormalizationError("No schematic sheets to normalize")
+
+    root = sheets[0]
+    components = [c for s in sheets for c in s.components]
+    all_fragments = [f for s in sheets for f in s.fragments]
+    nets = _merge_hierarchy_nets(
+        all_fragments,
+        bridges=bridges,
+        design_id=design_id or root.sheet_uuid or "kicad",
+    )
+
+    blocks = [
+        Block(
+            id=s.sheet_uuid or s.sheet_path,
+            name=s.sheet_name or s.sheet_path,
+            description=f"sheet_path={s.sheet_path}"
+            + (f"; file={s.file_path}" if s.file_path else ""),
+            component_refs=[c.reference for c in s.components],
+        )
+        for s in sheets
+    ]
+
+    return Design(
+        id=design_id or (f"kicad.{root.sheet_uuid}" if root.sheet_uuid else "kicad.unknown"),
+        source_tool=SourceTool.KICAD,
+        source_version=root.version,
+        revision="0",
+        name=root.title,
+        blocks=blocks,
+        components=components,
+        nets=nets,
+    )
+
+
+class _FragmentUF:
+    def __init__(self, n: int) -> None:
+        self.parent = list(range(n))
+
+    def find(self, i: int) -> int:
+        while self.parent[i] != i:
+            self.parent[i] = self.parent[self.parent[i]]
+            i = self.parent[i]
+        return i
+
+    def union(self, a: int, b: int) -> None:
+        ra, rb = self.find(a), self.find(b)
+        if ra != rb:
+            self.parent[rb] = ra
+
+
+def _merge_hierarchy_nets(
+    fragments: list[_SheetNetFragment],
+    *,
+    bridges: list[_HierarchyBridge],
+    design_id: str,
+) -> list[Net]:
+    if not fragments:
+        return []
+
+    uf = _FragmentUF(len(fragments))
+
+    # Global / power labels with the same name merge across sheets.
+    global_index: dict[str, int] = {}
+    for i, frag in enumerate(fragments):
+        for lb in frag.labels:
+            if lb.scope != "global":
+                continue
+            prev = global_index.get(lb.name)
+            if prev is None:
+                global_index[lb.name] = i
+            else:
+                uf.union(prev, i)
+
+    # Hierarchical sheet-pin ↔ child hierarchical_label bridges.
+    def _hier_index(sheet_path: str, name: str) -> list[int]:
+        hits: list[int] = []
+        for i, frag in enumerate(fragments):
+            if frag.sheet_path != sheet_path:
+                continue
+            if any(lb.scope == "hierarchical" and lb.name == name for lb in frag.labels):
+                hits.append(i)
+        return hits
+
+    for bridge in bridges:
+        parent_hits = _hier_index(bridge.parent_sheet_path, bridge.pin_name)
+        child_hits = _hier_index(bridge.child_sheet_path, bridge.pin_name)
+        for p in parent_hits:
+            for c in child_hits:
+                uf.union(p, c)
+
+    groups: dict[int, list[int]] = {}
+    for i in range(len(fragments)):
+        groups.setdefault(uf.find(i), []).append(i)
+
+    nets: list[Net] = []
+    anonymous_i = 0
+    for members in groups.values():
+        frags = [fragments[i] for i in members]
+        labels = [lb for f in frags for lb in f.labels]
+        endpoints = [ep for f in frags for ep in f.endpoints]
+        seen: set[tuple[str, str]] = set()
+        uniq: list[Endpoint] = []
+        for ep in sorted(endpoints, key=lambda e: (e.component_ref, e.pin_number)):
+            key = (ep.component_ref, ep.pin_number)
+            if key in seen:
+                continue
+            seen.add(key)
+            uniq.append(ep)
+
+        name = _choose_net_name(labels, [])
+        if name is None:
+            for f in frags:
+                if f.name_hint:
+                    name = f.name_hint
+                    break
+        if name is None:
+            anonymous_i += 1
+            if uniq:
+                name = f"Net-({uniq[0].component_ref}-Pad{uniq[0].pin_number})"
+            else:
+                name = f"Net-{anonymous_i}"
+
+        uuid_seed = f"{design_id}:{name}:" + ",".join(
+            f"{e.component_ref}.{e.pin_number}" for e in uniq
+        )
         nets.append(
             Net(
                 name=name,
                 endpoints=uniq,
-                net_class=net_class,
+                net_class=_infer_net_class(name, labels),
                 voltage_domain=_infer_voltage_domain(name),
                 uuid=str(uuid5(_NET_NS, uuid_seed)),
             )
@@ -273,6 +513,33 @@ def _build_nets(graph: ConnectivityGraph, *, design_id: str) -> list[Net]:
 
     nets.sort(key=lambda n: n.name)
     return nets
+
+
+def _build_nets(graph: ConnectivityGraph, *, design_id: str) -> list[Net]:
+    """Build nets from a single-sheet connectivity graph (test/helper path)."""
+    fragments: list[_SheetNetFragment] = []
+    for group in graph.net_groups():
+        pins: list[PinAttachment] = group["pins"]
+        labels: list[LabelAttachment] = group["labels"]
+        if not pins and not labels:
+            continue
+        endpoints = [
+            Endpoint(
+                component_ref=p.component_ref,
+                pin_number=p.pin_number,
+                pin_name=p.pin_name,
+            )
+            for p in sorted(pins, key=lambda p: (p.component_ref, p.pin_number))
+        ]
+        fragments.append(
+            _SheetNetFragment(
+                sheet_path="/",
+                endpoints=endpoints,
+                labels=list(labels),
+                name_hint=_choose_net_name(labels, pins),
+            )
+        )
+    return _merge_hierarchy_nets(fragments, bridges=[], design_id=design_id)
 
 
 def _choose_net_name(labels: list[LabelAttachment], pins: list[PinAttachment]) -> str | None:
@@ -374,6 +641,9 @@ def _parse_lib_pin(pin_node: SExprNode) -> dict | None:
 def _symbol_instance_to_component(
     sym: SExprNode,
     lib_pins: dict[str, list[dict]],
+    *,
+    sheet_path: str = "/",
+    file_path: str | None = None,
 ) -> tuple[Component | None, list[PinAttachment]]:
     lib_id_node = sym.find("lib_id")
     if lib_id_node is None:
@@ -407,6 +677,8 @@ def _symbol_instance_to_component(
     # lib_symbols mark power symbols with (power); instances inherit via lib_id prefix.
     if lib_id.startswith("power:"):
         is_power = True
+
+    resolved_sheet = symbol_instance_sheet_path(sym, default=sheet_path)
 
     pin_defs = lib_pins.get(lib_id, [])
     # Fall back to instance pin numbers if library missing.
@@ -454,7 +726,7 @@ def _symbol_instance_to_component(
             )
         )
 
-    attributes: dict = {"lib_id": lib_id}
+    attributes: dict = {"lib_id": lib_id, "sheet_path": resolved_sheet}
     if is_power:
         attributes["power_symbol"] = True
     mpn = props.get("MPN") or props.get("Manufacturer_Part_Number")
@@ -468,7 +740,13 @@ def _symbol_instance_to_component(
         footprint_ref=footprint,
         pins=pins,
         attributes=attributes,
-        source_location=SourceLocation(uuid=uuid, x=ix, y=iy, sheet="/"),
+        source_location=SourceLocation(
+            uuid=uuid,
+            x=ix,
+            y=iy,
+            sheet=resolved_sheet,
+            path=file_path,
+        ),
         uuid=uuid,
     )
     return component, attachments

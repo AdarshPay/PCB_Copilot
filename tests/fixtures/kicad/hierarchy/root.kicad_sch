@@ -1,0 +1,230 @@
+(kicad_sch
+  (version 20250114)
+  (generator "pcb-ai")
+  (generator_version "0.1")
+  (uuid "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeee0001")
+  (paper "A4")
+  (title_block
+    (title "Hierarchy root")
+  )
+  (lib_symbols
+    (symbol "Device:R"
+      (pin_numbers
+        (hide yes)
+      )
+      (pin_names
+        (offset 0)
+      )
+      (exclude_from_sim no)
+      (in_bom yes)
+      (on_board yes)
+      (property "Reference" "R"
+        (at 2.032 0 90)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property "Value" "R"
+        (at 0 0 90)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+        )
+      )
+      (property "Footprint" ""
+        (at -1.778 0 90)
+        (effects
+          (font
+            (size 1.27 1.27)
+          )
+          (hide yes)
+        )
+      )
+      (symbol "R_0_1"
+        (rectangle
+          (start -1.016 -2.54)
+          (end 1.016 2.54)
+          (stroke
+            (width 0.254)
+            (type default)
+          )
+          (fill
+            (type none)
+          )
+        )
+      )
+      (symbol "R_1_1"
+        (pin passive line
+          (at 0 3.81 270)
+          (length 1.27)
+          (name "~"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number "1"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+        (pin passive line
+          (at 0 -3.81 90)
+          (length 1.27)
+          (name "~"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+          (number "2"
+            (effects
+              (font
+                (size 1.27 1.27)
+              )
+            )
+          )
+        )
+      )
+    )
+  )
+  (symbol
+    (lib_id "Device:R")
+    (at 100 80 0)
+    (unit 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (dnp no)
+    (uuid "00000000-0000-4000-8000-000000000001")
+    (property "Reference" "R1"
+      (at 102.032 80 90)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property "Value" "10k"
+      (at 100 80 90)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property "Footprint" "Resistor_SMD:R_0603_1608Metric"
+      (at 98.222 80 90)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+        (hide yes)
+      )
+    )
+    (pin "1"
+      (uuid "00000000-0000-4000-8000-000000000011")
+    )
+    (pin "2"
+      (uuid "00000000-0000-4000-8000-000000000012")
+    )
+    (instances
+      (project ""
+        (path "/"
+          (reference "R1")
+          (unit 1)
+        )
+      )
+    )
+  )
+  (global_label "VIN"
+    (shape input)
+    (at 100 83.81 180)
+    (fields_autoplaced)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+      (justify right)
+    )
+    (uuid "00000000-0000-4000-8000-0000000000a1")
+  )
+  (sheet
+    (at 140 60)
+    (size 40 40)
+    (stroke
+      (width 0.1524)
+      (type solid)
+    )
+    (fill
+      (color 0 0 0 0.0000)
+    )
+    (uuid "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+    (property "Sheetname" "Child"
+      (at 140 59 0)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+        (justify left bottom)
+      )
+    )
+    (property "Sheetfile" "child.kicad_sch"
+      (at 140 101 0)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+        (justify left top)
+      )
+    )
+    (pin "SIG" input
+      (at 140 76.19 180)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+        (justify right)
+      )
+      (uuid "00000000-0000-4000-8000-0000000000s1")
+    )
+  )
+  (wire
+    (pts
+      (xy 100 76.19)
+      (xy 140 76.19)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "00000000-0000-4000-8000-0000000000b1")
+  )
+  (wire
+    (pts
+      (xy 100 83.81)
+      (xy 100 83.81)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "00000000-0000-4000-8000-0000000000b2")
+  )
+  (sheet_instances
+    (path "/"
+      (page "1")
+    )
+    (path "/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+      (page "2")
+    )
+  )
+)

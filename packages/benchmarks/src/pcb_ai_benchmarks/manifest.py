@@ -179,6 +179,11 @@ def run_first_pack_benchmark(fixtures_dir: Path) -> RunManifest:
         "i2c_sensor.json",
         "ldo_rail.json",
         "uart_bridge.json",
+        "can_transceiver.json",
+        "rs485_link.json",
+        "esd_connector.json",
+        "buck_regulator.json",
+        "programming_header.json",
     )
     for name in clean_names:
         path = golden_dir / name

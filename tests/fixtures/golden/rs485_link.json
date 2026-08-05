@@ -1,0 +1,296 @@
+{
+  "id": "fixture.rs485_link",
+  "source_tool": "synthetic",
+  "source_version": "fixture-0.1",
+  "revision": "1",
+  "name": "MCU plus RS-485 transceiver",
+  "requirements": [
+    {
+      "id": "req.rs485_link",
+      "text": "MAX3485 bridges MCU UART to a differential A/B RS-485 bus with termination.",
+      "priority": "must"
+    }
+  ],
+  "blocks": [
+    {
+      "id": "blk.mcu",
+      "name": "MCU",
+      "component_refs": ["U1"]
+    },
+    {
+      "id": "blk.rs485",
+      "name": "RS-485",
+      "component_refs": ["U2", "R1"]
+    }
+  ],
+  "components": [
+    {
+      "reference": "U1",
+      "manufacturer_part_number": "RP2040",
+      "value": "RP2040",
+      "functional_class": "mcu",
+      "symbol_ref": "MCU_RaspberryPi:RP2040",
+      "footprint_ref": "Package_DFN_QFN:QFN-56-1EP_7x7mm_P0.4mm",
+      "pins": [
+        {
+          "number": "1",
+          "name": "GPIO0",
+          "electrical_role": "digital_out",
+          "interface_role": "uart_tx",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "2",
+          "name": "GPIO1",
+          "electrical_role": "digital_in",
+          "interface_role": "uart_rx",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "3",
+          "name": "GPIO2",
+          "electrical_role": "digital_out",
+          "interface_role": "rs485_de",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "4",
+          "name": "VDD",
+          "electrical_role": "power_in",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "5",
+          "name": "GND",
+          "electrical_role": "ground",
+          "voltage_domain": "GND"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000061"
+    },
+    {
+      "reference": "U2",
+      "manufacturer_part_number": "MAX3485",
+      "value": "MAX3485",
+      "functional_class": "transceiver",
+      "symbol_ref": "Interface_UART:MAX3485",
+      "footprint_ref": "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+      "pins": [
+        {
+          "number": "1",
+          "name": "RO",
+          "electrical_role": "digital_out",
+          "interface_role": "uart_rx",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "2",
+          "name": "RE",
+          "electrical_role": "enable",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "3",
+          "name": "DE",
+          "electrical_role": "enable",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "4",
+          "name": "DI",
+          "electrical_role": "digital_in",
+          "interface_role": "uart_tx",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "5",
+          "name": "GND",
+          "electrical_role": "ground",
+          "voltage_domain": "GND"
+        },
+        {
+          "number": "6",
+          "name": "A",
+          "electrical_role": "digital_bidir",
+          "interface_role": "rs485_a",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "7",
+          "name": "B",
+          "electrical_role": "digital_bidir",
+          "interface_role": "rs485_b",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "8",
+          "name": "VCC",
+          "electrical_role": "power_in",
+          "voltage_domain": "3V3"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000062"
+    },
+    {
+      "reference": "R1",
+      "value": "120",
+      "functional_class": "passive",
+      "symbol_ref": "Device:R",
+      "footprint_ref": "Resistor_SMD:R_0603_1608Metric",
+      "pins": [
+        {
+          "number": "1",
+          "name": "1",
+          "electrical_role": "passive"
+        },
+        {
+          "number": "2",
+          "name": "2",
+          "electrical_role": "passive"
+        }
+      ],
+      "attributes": {
+        "role": "rs485_termination"
+      },
+      "uuid": "00000000-0000-4000-8000-000000000063"
+    }
+  ],
+  "nets": [
+    {
+      "name": "3V3",
+      "class": "power",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "4"
+        },
+        {
+          "component_ref": "U2",
+          "pin_number": "8"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000101"
+    },
+    {
+      "name": "GND",
+      "class": "ground",
+      "voltage_domain": "GND",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "5"
+        },
+        {
+          "component_ref": "U2",
+          "pin_number": "5"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000102"
+    },
+    {
+      "name": "UART_TX",
+      "class": "signal",
+      "protocol": "uart",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "1"
+        },
+        {
+          "component_ref": "U2",
+          "pin_number": "4"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000103"
+    },
+    {
+      "name": "UART_RX",
+      "class": "signal",
+      "protocol": "uart",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U2",
+          "pin_number": "1"
+        },
+        {
+          "component_ref": "U1",
+          "pin_number": "2"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000104"
+    },
+    {
+      "name": "RS485_DE",
+      "class": "signal",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "3"
+        },
+        {
+          "component_ref": "U2",
+          "pin_number": "2"
+        },
+        {
+          "component_ref": "U2",
+          "pin_number": "3"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000105"
+    },
+    {
+      "name": "RS485_A",
+      "class": "differential",
+      "protocol": "rs485",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U2",
+          "pin_number": "6"
+        },
+        {
+          "component_ref": "R1",
+          "pin_number": "1"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000106"
+    },
+    {
+      "name": "RS485_B",
+      "class": "differential",
+      "protocol": "rs485",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U2",
+          "pin_number": "7"
+        },
+        {
+          "component_ref": "R1",
+          "pin_number": "2"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-000000000107"
+    }
+  ],
+  "assertions": [
+    {
+      "id": "assert.rs485_cross",
+      "kind": "interface",
+      "expression": "MCU TX drives DI; RO drives MCU RX; DE/RE share MCU control",
+      "severity": "error"
+    }
+  ],
+  "evidence_refs": [
+    {
+      "id": "fixture:rs485_link",
+      "kind": "fixture",
+      "title": "Golden RS-485 link",
+      "confidence": 1.0
+    }
+  ]
+}
