@@ -63,3 +63,32 @@ def test_parse_sheet_and_hierarchical_label() -> None:
     assert sheet.find_all("property")[1].atom_at(1) == "child.kicad_sch"
     assert sheet.find("pin").atom_at(0) == "SIG"
     assert ast.find("hierarchical_label").atom_at(0) == "SIG"
+
+
+def test_parse_bus_and_bus_entry() -> None:
+    src = """
+    (kicad_sch
+      (version 20250114)
+      (bus
+        (pts (xy 0 0) (xy 10 0))
+        (uuid "bus-uuid")
+      )
+      (bus_entry
+        (at 0 5)
+        (size 0 -5)
+        (uuid "entry-uuid")
+      )
+      (label "D[1..0]"
+        (at 5 0 0)
+        (uuid "label-uuid")
+      )
+    )
+    """
+    ast = parse_schematic_sexpr(src)
+    assert ast.find("bus") is not None
+    assert ast.find("bus").find("uuid").atom_at(0) == "bus-uuid"
+    entry = ast.find("bus_entry")
+    assert entry is not None
+    assert entry.find("at").atom_at(0) == "0"
+    assert entry.find("size").atom_at(1) == "-5"
+    assert ast.find("label").atom_at(0) == "D[1..0]"

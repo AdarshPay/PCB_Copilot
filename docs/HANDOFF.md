@@ -22,15 +22,18 @@ Plan of record: `pcb_ai_implementation_plan_v0.md` (v0.2)
 | 10 Review artifact | Done | JSON + HTML report, run manifest |
 | Day 30 rules | Done | 10 checks in RULE_PACK_V0 (incl. footprint presence) |
 | Day 30 CI command | Done | Offline ingest + rules + ERC fixture; `.github/workflows/ci.yml` |
-| Day 30 scale | Near | **~9 clean / ~91 mutations** (target 10/100) |
-| Hierarchy normalize | In progress | Multi-sheet ingest + UUID helpers; known gaps remain |
-| Component profiles | In progress | **16** curated profiles + registry (target 20–30) |
+| Day 30 scale | Done | **10 clean / 100 mutations + conflict = 111** cases (all pass) |
+| Hierarchy normalize | Mostly done | Shared-sheet multi-instance + bus members; emit still flat/connectivity-faithful |
+| Component profiles | Done | **30** curated profiles + registry |
 | Evidence service | Foundation done | `EvidenceService` + seed catalog + `attach_evidence` hook |
-| Typed remediations / tx | Done (IR) | Deterministic remediations, expanded `apply_operations`, `POST /v1/proposals`; planner default **off** |
+| Typed remediations / tx | Done (IR + temp emit) | Deterministic remediations, `apply_operations`, `compile_temp_branch`, `POST /v1/proposals`, `POST /v1/temp-branch` |
+| Approval telemetry | Done | `DecisionRecord` + `POST /v1/proposals/{id}/decision`, `POST/GET /v1/decisions` |
 
 **Sprint exit criterion (met):** one schematic can be ingested, normalized, checked, round-tripped, and reported **without an LLM**.
 
-**Next horizon:** Close remaining Phase A gates (scale 10/100, profiles 20–30, approval telemetry, full KiCad temp-branch emit, remaining normalize gaps), then **gate to Phase B** AI layout/redraw, then Phase C prompt-to-CAD. Do **not** start layout or prompt-to-CAD until Phase A gates in the plan are met.
+**Phase A gates:** largely met for the Day-60 agent-ready bar (scale 10/100+, profiles 30/30, temp-branch emit, telemetry, normalize progress). Residual: lossless multi-file hierarchy emit and deeper bus/geometry fidelity — acceptable as known limits, not blockers for starting Phase B.
+
+**Next horizon:** **Phase B AI layout/redraw** (PCB IR + DRC + placement/routing agent), then Phase C prompt-to-CAD. Do **not** treat residual emit hierarchy gaps as a reason to reopen Phase A scope unless layout work depends on them.
 
 ## Architecture (source of truth)
 
@@ -43,9 +46,11 @@ Plan of record: `pcb_ai_implementation_plan_v0.md` (v0.2)
                 ↓
      typed Operations (deterministic remediations; planner default off)
                 ↓
-     apply_operations / export_branch_diff (IR copy only today)
+     apply_operations / export_branch_diff (IR copy)
                 ↓
-     (remaining) full KiCad temp-branch emit → human approve
+     compile_temp_branch → temporary .kicad_sch (connectivity-faithful)
+                ↓
+     DecisionRecord approve/reject telemetry → human promote (not auto)
 ```
 
 Non-negotiables from the plan:
@@ -58,24 +63,24 @@ Non-negotiables from the plan:
 ## Repo map
 
 ```text
-apps/api/                 FastAPI: /health, /v1/reviews, /v1/reviews/html, /v1/ingest/schematic, /v1/proposals
+apps/api/                 FastAPI: /health, /v1/reviews, /v1/ingest/schematic, /v1/proposals, /v1/temp-branch, /v1/decisions
 apps/web/                 Stub only
 apps/kicad-plugin/        Stub only
 packages/circuit-ir/      Design, Component, Pin, Net, Finding, Operation, ReviewReport, NetFragment
-packages/kicad-adapter/   parser, connectivity, normalize (hierarchy), emit, semantic/UUID helpers, CLI
+packages/kicad-adapter/   parser, connectivity, normalize (hierarchy), emit (write_schematic), semantic/UUID helpers, CLI
 packages/verification/    RULE_PACK_V0, ERC, report/HTML, attach_evidence hook
-packages/transactions/    apply_operations, semantic_diff, export_branch_diff (IR-level; no CAD emit yet)
+packages/transactions/    apply_operations, semantic_diff, export_branch_diff, compile_temp_branch
 packages/benchmarks/      first-pack mutation benchmark + RunManifest + CI hardware check
 packages/evidence/        EvidenceService, seed catalog, store
-packages/agent/           Planner (default off), DeterministicRemediationBackend, typed remediations
-packages/component-library/  16 ComponentProfile entries + registry
+packages/agent/           Planner (default off), DeterministicRemediationBackend, DecisionTelemetry
+packages/component-library/  30 ComponentProfile entries + registry
 packages/simulation/      Stub / early models
 services/worker/          Redis jobs: verify_design, run_erc
 infra/local-compose.yml   Postgres(pgvector), Redis, MinIO
 infra/docker/kicad-cli/   KiCad 10 CLI image wrapper
-tests/fixtures/golden/    9 clean IR goldens + output_conflict
-tests/fixtures/kicad/     rc_divider.kicad_sch, hierarchy/, ERC JSON fixture
-tests/mutation/           single-fault IR mutators
+tests/fixtures/golden/    10 clean IR goldens + output_conflict
+tests/fixtures/kicad/     rc_divider, hierarchy/, shared_sheet/, bus/, ERC JSON fixture
+tests/mutation/           single-fault IR mutators (10)
 ```
 
 ## What works today
@@ -88,8 +93,11 @@ Pydantic v2 models in `packages/circuit-ir`. Nets are hyperedges (multi-pin). Ex
 - Geometric connectivity → nets
 - Normalize symbols/pins/labels/power into IR
 - **Hierarchy / multi-sheet ingest** (root + child sheets; sheet-pin ↔ hierarchical_label merge)
+- **Shared-sheet multi-instance** ingest (`fixtures/kicad/shared_sheet/`)
+- **Bus members** (`fixtures/kicad/bus/` — vector labels, `bus` / `bus_entry`)
 - UUID helpers: `uuid_fingerprint`, `uuid_equal`, `collect_ast_uuids`
 - Semantic round-trip helpers
+- Emit: `emit_schematic_ast` / `emit_schematic_text` / `write_schematic` — **connectivity-faithful** (synthetic geometry; flat single-file; not lossless multi-sheet rewrite)
 - CLI: `python -m pcb_ai_kicad_adapter path.kicad_sch [--rules] [--report] [--html out.html] [-o out.json] [--emit out.kicad_sch]`
 - API: `POST /v1/ingest/schematic` (multipart file)
 
@@ -115,23 +123,28 @@ Pydantic v2 models in `packages/circuit-ir`. Nets are hyperedges (multi-pin). Ex
 - `build_review_report()` → findings, summary, net fragments (current or before/after)
 - `render_html_report()` → self-contained HTML
 - API: `POST /v1/reviews`, `POST /v1/reviews/html`
-- Benchmark: `python -m pcb_ai_benchmarks -o reports/run-manifest.json` (**91** cases: 9 clean × 9 mutations + conflict fixture)
+- Benchmark: `python -m pcb_ai_benchmarks -o reports/run-manifest.json` (**111** cases: 10 clean × 10 mutations + conflict fixture; all pass)
 - CI hardware check: `python -m pcb_ai_benchmarks.ci_check` (offline ERC fixture; no Docker KiCad)
 
-### Component profiles (16 / target 20–30)
-Curated `ComponentProfile` registry in `packages/component-library` (MCU, sensors, regulators, transceivers, bridges, protection). Lookup via `load_all` / `get_by_mpn` / `list_by_class`.
+### Component profiles (30 / target 20–30)
+Curated `ComponentProfile` registry in `packages/component-library` (MCU, sensors, regulators, transceivers, bridges, protection, connectors, programming, passives, switches). Lookup via `load_all` / `get_by_mpn` / `list_by_class`.
 
 ### Evidence (foundation)
 - `EvidenceService` + seed catalog + JSON store
 - Verification hook: `attach_evidence(findings)` enriches findings with citations
 - Not yet a full datasheet ingestion / retrieval pipeline
 
-### Agent / transactions (IR-only; no production CAD)
+### Agent / transactions / temp-branch
 - Deterministic remediations (`pcb_ai_agent.remediation` / `DeterministicRemediationBackend`)
 - `Planner(enabled=False)` by default — opt-in only
 - Expanded `apply_operations` + `export_branch_diff` (semantic IR before/after; `production_mutation: false`)
-- API: `POST /v1/proposals` (typed ops on a Design copy)
-- **Not yet:** full KiCad temp-branch emit, approval telemetry
+- **`compile_temp_branch` / `emit_design_to_temp`** — ingest → apply ops on IR copy → `write_schematic` under `dest_dir` (never overwrites production path); emit mode `connectivity_faithful`
+- API: `POST /v1/proposals` (typed ops on a Design copy; registers proposal for telemetry)
+- API: `POST /v1/temp-branch` (multipart schematic + operations JSON → temp `.kicad_sch` text + branch_diff)
+
+### Approval telemetry
+- `DecisionRecord` / `DecisionTelemetry` (in-memory default; optional JSONL via `PCB_AI_DECISION_TELEMETRY_PATH`)
+- API: `POST /v1/proposals/{proposal_id}/decision`, `POST /v1/decisions`, `GET /v1/decisions`
 
 ## How to run locally
 
@@ -166,28 +179,26 @@ Notes:
 
 ## Tests
 
-Expect **193 passed** after Phase A workstream reconcile (`pytest`). Key suites:
+Expect **231 passed** after Phase A gap reconcile (`pytest`). Key suites:
 - `tests/test_golden_fixtures.py`, `test_rules.py`, `test_mutation_rules.py`
 - `tests/test_parser.py`, `test_roundtrip_kicad.py`
 - `tests/test_erc.py`, `test_report.py`, `test_benchmark_manifest.py`, `test_ci_hardware_check.py`, `test_api.py`
-- `tests/test_agent.py`, `test_transactions.py`, `test_evidence.py`, `test_component_library.py`
+- `tests/test_agent.py`, `test_transactions.py`, `test_temp_branch.py`, `test_decision_telemetry.py`
+- `tests/test_evidence.py`, `test_component_library.py`
 
-## Remaining Phase A gaps
+## Remaining gaps (non-blocking for Phase B gate)
 
-1. **Scale:** 1 more clean project + ~9 mutations to hit Day 30 target **10 clean / 100 mutations** (currently ~9 / ~91).
-2. **Profiles:** grow from **16 → 20–30** curated component profiles.
-3. **Approval telemetry:** record human approve/reject of proposals (not built).
-4. **Full KiCad temp-branch emit:** IR `apply_operations` / `export_branch_diff` only; no temporary `.kicad_sch` branch write-out yet.
-5. **Normalize gaps:** complex hierarchy (shared sheet / multi-instance), bus members, lossless emit of original geometry/sheet structure (emit is connectivity-faithful) — see `tests/roundtrip/README.md`.
-6. Then: **finish Phase A gates → Phase B layout** (do not start Phase B early).
+1. **Lossless multi-file emit:** emit remains a flat connectivity sketch — no child `.kicad_sch` rewrite, `(sheet …)` symbols, or hierarchical pins as a multi-file project (see `tests/roundtrip/README.md`).
+2. **Emit geometry / bus fidelity:** synthetic star wires; advanced KiCad bus aliases beyond `NAME[M..N]` / `{A B}` not expanded.
+3. **Evidence depth:** seed catalog only — no full datasheet ingestion / retrieval pipeline.
+4. Then: **Phase B layout** (PCB IR + DRC + placement/routing), then Phase C prompt-to-CAD.
 
 ## Explicitly not built yet
 
 - React review UI / real KiCad plugin
 - LLM planner enabled in production (seam exists; default **off**; deterministic backend only)
-- Full transaction compiler → temporary KiCad branch workflow (IR path only today)
-- Full 20–30 component profiles (16 present) + deep datasheet evidence pipeline
-- Approval / reject telemetry
+- Lossless layout-preserving / multi-file KiCad hierarchy rewrite on emit
+- Deep datasheet evidence pipeline
 - ngspice simulation jobs
 - Altium support
 - **Phase B:** AI placement/routing / board redraw
@@ -198,17 +209,16 @@ Expect **193 passed** after Phase A workstream reconcile (`pytest`). Key suites:
 ## Recommended next work
 
 Prioritize in order:
-1. Close Day 30 scale: **+1 clean golden + mutations → 10/100**.
-2. Add **4–14 more profiles** toward 20–30.
-3. Remaining normalize gaps (shared-sheet hierarchy, buses, lossless emit).
-4. Approval telemetry + full KiCad temp-branch emit (gate pieces).
-5. Only after Phase A gates: PCB IR + DRC + layout agent (Phase B), then bounded prompt-to-CAD (Phase C).
+1. **Phase B:** PCB IR + DRC foundations and layout/redraw agent seams.
+2. Optionally harden normalize/emit fidelity if layout workflows need multi-file hierarchy round-trip.
+3. Grow evidence beyond seed catalog when remediation quality needs datasheet citations.
+4. Bounded prompt-to-CAD (Phase C) only after Phase B gates in the plan.
 
 ## Guardrails for the next agent
 
 - Prefer small, test-backed diffs over broad refactors.
 - Do not enable LLM CAD mutation of production files; branch-only + human approval.
-- Do not start routing / autonomous layout or prompt-to-CAD until Phase A gates in the plan are met.
+- Phase A gates are largely met — start Phase B layout work per the plan; do not reopen broad Phase A scope for residual emit limits unless blocked.
 - Keep ERC/DRC/SPICE success from being treated as product-level correctness.
 - Commit only when the user asks; never force-push `main`.
 - Read `pcb_ai_implementation_plan_v0.md` (v0.2) before changing product direction.
@@ -225,12 +235,14 @@ Prioritize in order:
 | Evidence service | `packages/evidence/src/pcb_ai_evidence/service.py` |
 | Component profiles | `packages/component-library/src/pcb_ai_component_library/registry.py` |
 | KiCad normalize / hierarchy | `packages/kicad-adapter/src/pcb_ai_kicad_adapter/normalize.py`, `hierarchy.py` |
+| Emit / write_schematic | `packages/kicad-adapter/src/pcb_ai_kicad_adapter/emit.py` |
 | UUID / semantic helpers | `packages/kicad-adapter/src/pcb_ai_kicad_adapter/semantic.py` |
 | ERC | `packages/verification/src/pcb_ai_verification/erc_*.py` |
 | Mutations | `tests/mutation/ir_mutators.py` |
 | Benchmark manifest | `packages/benchmarks/src/pcb_ai_benchmarks/manifest.py` |
 | CI hardware check | `packages/benchmarks/src/pcb_ai_benchmarks/ci_check.py` |
-| Agent / remediations | `packages/agent/src/pcb_ai_agent/` |
-| Transactions | `packages/transactions/src/pcb_ai_transactions/compiler.py` |
-| Proposals API | `apps/api/src/pcb_ai_api/routes/proposals.py` |
+| Agent / remediations / telemetry | `packages/agent/src/pcb_ai_agent/` |
+| Transactions / temp-branch | `packages/transactions/src/pcb_ai_transactions/` |
+| Proposals + decisions API | `apps/api/src/pcb_ai_api/routes/proposals.py` |
+| Temp-branch API | `apps/api/src/pcb_ai_api/routes/temp_branch.py` |
 | API | `apps/api/src/pcb_ai_api/` |

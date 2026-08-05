@@ -21,6 +21,8 @@ Phase A MVP architecture, Circuit IR, rule pack, and foundations → layout → 
 ## KiCad hierarchy / UUID round-trip (Phase A research)
 
 - Ingest walks `(sheet …)` / `Sheetfile` children and sets `SourceLocation.sheet` to KiCad-style paths (`/`, `/{sheet-uuid}`, …).
+- The same Sheetfile may be instantiated multiple times (distinct sheet UUIDs / paths); per-path `(instances … (reference …))` selects designators.
 - Connectivity merges global/power labels across sheets and bridges parent sheet pins to child `hierarchical_label`s by name.
+- Buses: `(bus)` / `(bus_entry)` stay on a separate connectivity graph from wires; vector/group labels expand to members (`bus_members` / `bus` constraints). Members are not shorted together.
 - AST serialize preserves UUID atoms; `uuid_fingerprint` / `uuid_equal` assert component UUID survival through emit.
-- Fixture: `tests/fixtures/kicad/hierarchy/`. Emit remains a flat connectivity sketch (not a lossless hierarchy writer).
+- Fixtures: `tests/fixtures/kicad/hierarchy/`, `shared_sheet/`, `bus/`. Emit is connectivity-faithful with partial sheet-path / coordinate preservation — not a lossless multi-file hierarchy writer (see `tests/roundtrip/README.md`).

@@ -166,6 +166,7 @@ def run_first_pack_benchmark(fixtures_dir: Path) -> RunManifest:
         mutate_missing_power_source,
         mutate_output_conflict,
         mutate_reversed_polarity,
+        mutate_undriven_enable,
         mutate_undriven_input,
         mutate_voltage_domain_conflict,
     )
@@ -184,6 +185,7 @@ def run_first_pack_benchmark(fixtures_dir: Path) -> RunManifest:
         "esd_connector.json",
         "buck_regulator.json",
         "programming_header.json",
+        "spi_flash.json",
     )
     for name in clean_names:
         path = golden_dir / name
@@ -198,6 +200,7 @@ def run_first_pack_benchmark(fixtures_dir: Path) -> RunManifest:
             ("missing_footprint", mutate_missing_footprint, "struct.footprint_presence"),
             ("output_conflict", mutate_output_conflict, "elec.output_conflict"),
             ("undriven_input", mutate_undriven_input, "elec.undriven_input"),
+            ("undriven_enable", mutate_undriven_enable, "elec.undriven_input"),
             ("missing_power_source", mutate_missing_power_source, "elec.power_source"),
             ("missing_open_drain_pullup", mutate_missing_open_drain_pullup, "elec.open_drain_pullup"),
             ("voltage_domain_conflict", mutate_voltage_domain_conflict, "elec.voltage_domain"),

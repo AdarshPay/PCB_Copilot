@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from pcb_ai_kicad_adapter.parser import SExprNode
+
+# Vector bus: DATA[7..0] → DATA7 … DATA0
+_BUS_VECTOR = re.compile(r"^(.+)\[(\d+)\.\.(\d+)\]$")
+# Group bus: {A B C} or MEM{WE OE} → A,B,C or MEMWE,MEMOE
+_BUS_GROUP = re.compile(r"^([^{]*)\{([^}]+)\}$")
 
 
 @dataclass
@@ -76,17 +82,91 @@ def resolve_child_path(parent_file: Path, sheet_filename: str) -> Path:
     return (parent_file.parent / child).resolve()
 
 
-def symbol_instance_sheet_path(sym: SExprNode, *, default: str = "/") -> str:
-    """Prefer the first `(instances … (path \"…\"))` entry; else `default`."""
+def symbol_instance_paths(sym: SExprNode) -> list[tuple[str, str | None]]:
+    """Return `(sheet_path, reference)` pairs from `(instances …)`."""
     instances = sym.find("instances")
     if instances is None:
-        return default
+        return []
+    out: list[tuple[str, str | None]] = []
     for project in instances.find_all("project"):
         for path_node in project.find_all("path"):
             raw = path_node.atom_at(0)
-            if raw is not None and raw != "":
-                return raw
+            if raw is None or raw == "":
+                continue
+            ref = None
+            for child in path_node.children:
+                if isinstance(child, SExprNode) and not child.is_atom and child.head == "reference":
+                    ref = child.atom_at(0)
+                    break
+            out.append((raw, ref))
+    return out
+
+
+def symbol_instance_sheet_path(
+    sym: SExprNode,
+    *,
+    default: str = "/",
+    preferred: str | None = None,
+) -> str:
+    """Resolve instance sheet path.
+
+    When `preferred` is set (current hierarchy visit path), match that entry.
+    Otherwise prefer the first `(instances … (path \"…\"))` entry; else `default`.
+    """
+    paths = symbol_instance_paths(sym)
+    if preferred is not None:
+        for path, _ref in paths:
+            if path == preferred:
+                return path
+        # Prefix match: preferred "/uuid" vs stored "/uuid/…" is uncommon; exact only.
+    if paths:
+        return paths[0][0]
     return default
+
+
+def symbol_instance_reference(
+    sym: SExprNode,
+    *,
+    sheet_path: str,
+    fallback: str | None,
+) -> str | None:
+    """Prefer `(instances … (path sheet_path (reference …)))` over property Reference."""
+    for path, ref in symbol_instance_paths(sym):
+        if path == sheet_path and ref:
+            return ref
+    return fallback
+
+
+def expand_bus_members(label: str) -> list[str] | None:
+    """Expand a KiCad bus label into member net names, or None if not a bus label.
+
+    Supports vector form ``NAME[M..N]`` (members ``NAMEk``) and group form
+    ``{A B}`` / ``PRE{A B}`` (members ``A``, ``B`` or ``PREA``, ``PREB``).
+    """
+    m = _BUS_VECTOR.match(label)
+    if m:
+        prefix, a_s, b_s = m.group(1), m.group(2), m.group(3)
+        a, b = int(a_s), int(b_s)
+        if a >= b:
+            indices = range(a, b - 1, -1)
+        else:
+            indices = range(a, b + 1)
+        return [f"{prefix}{i}" for i in indices]
+
+    m = _BUS_GROUP.match(label)
+    if m:
+        prefix, body = m.group(1), m.group(2)
+        parts = [p for p in body.replace(",", " ").split() if p]
+        if not parts:
+            return None
+        return [f"{prefix}{p}" for p in parts]
+
+    return None
+
+
+def is_bus_label(name: str) -> bool:
+    """True when `name` is a vector or group bus label."""
+    return expand_bus_members(name) is not None
 
 
 def root_sheet_instances_paths(root: SExprNode) -> list[str]:

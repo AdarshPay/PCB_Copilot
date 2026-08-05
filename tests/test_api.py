@@ -69,7 +69,37 @@ def test_propose_apply_on_copy() -> None:
     )
     assert response.status_code == 200
     body = response.json()
+    assert body["proposal_id"]
     assert body["operations"]
     assert body["after_design"] is not None
     assert body["branch_diff"]["production_mutation"] is False
     assert any(op["type"] == "add_component" for op in body["operations"])
+
+
+def test_temp_branch_endpoint_emits_schematic() -> None:
+    import json
+
+    content = RC_DIVIDER.read_bytes()
+    ops = [
+        {
+            "type": "set_component_value",
+            "target": "R2",
+            "payload": {"value": "4.7k"},
+            "risk_tier": "low",
+            "confidence": 1.0,
+        }
+    ]
+    response = client.post(
+        "/v1/temp-branch",
+        files={"file": ("rc_divider.kicad_sch", content, "application/octet-stream")},
+        data={"operations_json": json.dumps(ops), "branch_name": "api-temp"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["production_mutation"] is False
+    assert body["human_approval_required"] is True
+    assert body["schematic_text"].startswith("(kicad_sch")
+    assert body["branch_diff"]["production_mutation"] is False
+    assert body["temp_schematic_name"] == "rc_divider.kicad_sch"
+    # Production fixture on disk must remain untouched by the API path.
+    assert RC_DIVIDER.read_bytes() == content

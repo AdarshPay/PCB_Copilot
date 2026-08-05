@@ -5,6 +5,7 @@ description = "Typed edit operations, semantic diff, and rollback"
 requires-python = ">=3.12"
 dependencies = [
   "pcb-ai-circuit-ir",
+  "pcb-ai-kicad-adapter",
 ]
 
 [build-system]

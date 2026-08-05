@@ -37,6 +37,7 @@ def test_clean_and_conflict_goldens_exist() -> None:
         "esd_connector",
         "buck_regulator",
         "programming_header",
+        "spi_flash",
     }
 
 

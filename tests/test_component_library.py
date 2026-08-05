@@ -9,7 +9,7 @@ from pcb_ai_component_library import ComponentProfile, get_by_mpn, list_by_class
 # Golden-fixture MPNs that curated profiles must cover.
 FIXTURE_MPNS = {"RP2040", "TMP117", "AP2112K-3.3", "CP2102"}
 
-MIN_PROFILE_COUNT = 12
+MIN_PROFILE_COUNT = 24
 
 
 def test_load_all_returns_curated_batch() -> None:
@@ -56,7 +56,10 @@ def test_list_by_class_filters() -> None:
     assert {p.orderable_mpn for p in mcus} >= {"RP2040", "STM32F103C8T6"}
     sensors = list_by_class("sensor")
     assert {p.orderable_mpn for p in sensors} >= {"TMP117", "BME280", "ICM-20602"}
-    assert list_by_class(FunctionalClass.PROGRAMMING) == []
+    programming = list_by_class(FunctionalClass.PROGRAMMING)
+    assert {p.orderable_mpn for p in programming} >= {"FTSH-105-01-L-DV", "TC2030-IDC-NL"}
+    connectors = list_by_class(FunctionalClass.CONNECTOR)
+    assert {p.orderable_mpn for p in connectors} >= {"USB4105-GF-A", "105017-0001"}
 
 
 def test_list_by_class_rejects_unknown_string() -> None:
@@ -88,4 +91,8 @@ def test_family_coverage() -> None:
         FunctionalClass.TRANSCEIVER,
         FunctionalClass.INTERFACE_BRIDGE,
         FunctionalClass.PROTECTION,
+        FunctionalClass.CONNECTOR,
+        FunctionalClass.PROGRAMMING,
+        FunctionalClass.PASSIVE,
+        FunctionalClass.OTHER,
     }

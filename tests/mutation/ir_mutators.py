@@ -176,6 +176,27 @@ def mutate_undriven_input(design: Design) -> Design:
     return mutant
 
 
+def mutate_undriven_enable(design: Design) -> Design:
+    """Add a required enable input that is not attached to any net.
+
+    Single-fault variant of undriven_input covering ElectricalRole.ENABLE
+    (same elec.undriven_input rule; distinct fault injection shape).
+    """
+    mutant = design.model_copy(deep=True)
+    mutant.components.append(
+        Component(
+            reference="U_MUT_EN",
+            value="MUT_ENABLE",
+            functional_class=FunctionalClass.OTHER,
+            pins=[
+                Pin(number="1", name="EN", electrical_role=ElectricalRole.ENABLE),
+            ],
+            uuid=str(uuid4()),
+        )
+    )
+    return mutant
+
+
 def mutate_missing_power_source(design: Design) -> Design:
     """Attach a power-input pin to a non-power net with no power_out driver."""
     mutant = design.model_copy(deep=True)

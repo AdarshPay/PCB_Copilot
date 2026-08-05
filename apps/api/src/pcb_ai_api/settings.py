@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     s3_secret_key: str = "pcbai-secret"
     s3_bucket: str = "pcb-ai"
     cors_origins: list[str] = ["http://localhost:5173"]
+    # Optional append-only JSONL path for engineer decision telemetry.
+    # Empty/unset → in-memory store (default for tests / local without persistence).
+    decision_telemetry_path: str = ""
 
 
 settings = Settings()

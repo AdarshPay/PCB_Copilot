@@ -11,6 +11,7 @@ from uuid import uuid5, UUID
 from pcb_ai_circuit_ir.models import (
     Block,
     Component,
+    Constraint,
     Design,
     ElectricalRole,
     Endpoint,
@@ -31,9 +32,11 @@ from pcb_ai_kicad_adapter.connectivity import (
 from pcb_ai_kicad_adapter.hierarchy import (
     SheetRef,
     child_sheet_path,
+    expand_bus_members,
     extract_sheet_refs,
+    is_bus_label,
     resolve_child_path,
-    symbol_instance_sheet_path,
+    symbol_instance_reference,
 )
 from pcb_ai_kicad_adapter.parser import SExprNode, parse_schematic_sexpr
 
@@ -49,6 +52,10 @@ class _SheetNetFragment:
     endpoints: list[Endpoint]
     labels: list[LabelAttachment]
     name_hint: str | None = None
+    is_bus: bool = False
+    bus_members: list[str] = field(default_factory=list)
+    bus_name: str | None = None  # member net → parent bus label name
+
 
 
 @dataclass
@@ -58,6 +65,7 @@ class _HierarchyBridge:
     parent_sheet_path: str
     child_sheet_path: str
     pin_name: str
+    pin_point: tuple[float, float] | None = None
 
 
 @dataclass
@@ -165,36 +173,52 @@ def ingest_schematic(
 def _ingest_hierarchy(root_path: Path, *, design_id: str) -> Design:
     sheets: list[_SheetNormalizeResult] = []
     bridges: list[_HierarchyBridge] = []
-    visited_files: set[Path] = set()
+    # Allow the same Sheetfile to be instantiated under multiple sheet paths.
+    # Detect true cycles via the active sheet-path stack (not by file path).
+    active_paths: set[str] = set()
+    seen_instances: set[str] = set()
+    ast_cache: dict[Path, SExprNode] = {}
 
     def visit(file_path: Path, sheet_path: str) -> _SheetNormalizeResult:
         resolved = file_path.resolve()
-        if resolved in visited_files:
+        if sheet_path in active_paths:
             raise NormalizationError(
-                f"Sheet file cycle or reuse not supported yet: {resolved}"
+                f"Hierarchical sheet cycle involving path {sheet_path!r} "
+                f"(file {resolved})"
             )
-        visited_files.add(resolved)
-        ast = parse_schematic_sexpr(resolved)
-        result = _normalize_sheet(ast, sheet_path=sheet_path, file_path=str(resolved))
-        sheets.append(result)
-        for ref in result.sheet_refs:
-            child_path = child_sheet_path(sheet_path, ref.uuid)
-            child_file = resolve_child_path(resolved, ref.filename)
-            if not child_file.is_file():
-                raise NormalizationError(
-                    f"Missing child schematic {ref.filename!r} "
-                    f"(resolved {child_file}) referenced from {resolved}"
-                )
-            for pin_name in ref.pin_names:
-                bridges.append(
-                    _HierarchyBridge(
-                        parent_sheet_path=sheet_path,
-                        child_sheet_path=child_path,
-                        pin_name=pin_name,
+        if sheet_path in seen_instances:
+            raise NormalizationError(
+                f"Duplicate sheet instance path {sheet_path!r} (file {resolved})"
+            )
+        active_paths.add(sheet_path)
+        seen_instances.add(sheet_path)
+        try:
+            if resolved not in ast_cache:
+                ast_cache[resolved] = parse_schematic_sexpr(resolved)
+            ast = ast_cache[resolved]
+            result = _normalize_sheet(ast, sheet_path=sheet_path, file_path=str(resolved))
+            sheets.append(result)
+            for ref in result.sheet_refs:
+                child_path = child_sheet_path(sheet_path, ref.uuid)
+                child_file = resolve_child_path(resolved, ref.filename)
+                if not child_file.is_file():
+                    raise NormalizationError(
+                        f"Missing child schematic {ref.filename!r} "
+                        f"(resolved {child_file}) referenced from {resolved}"
                     )
-                )
-            visit(child_file, child_path)
-        return result
+                for pin_name in ref.pin_names:
+                    bridges.append(
+                        _HierarchyBridge(
+                            parent_sheet_path=sheet_path,
+                            child_sheet_path=child_path,
+                            pin_name=pin_name,
+                            pin_point=ref.pin_points.get(pin_name),
+                        )
+                    )
+                visit(child_file, child_path)
+            return result
+        finally:
+            active_paths.discard(sheet_path)
 
     visit(root_path, "/")
     return _design_from_sheets(sheets, bridges=bridges, design_id=design_id)
@@ -213,7 +237,10 @@ def _normalize_sheet(
 
     lib_pins = _index_lib_symbol_pins(root.find("lib_symbols"))
     components: list[Component] = []
-    graph = ConnectivityGraph()
+    # Wire connectivity is separate from bus connectivity: bus_entry associates
+    # them by name/membership without electrically shorting all members together.
+    wire_graph = ConnectivityGraph()
+    bus_graph = ConnectivityGraph()
     instance_pin_points: list[tuple[Component, list[PinAttachment]]] = []
 
     for sym in root.find_all("symbol"):
@@ -231,27 +258,47 @@ def _normalize_sheet(
         components.append(component)
         instance_pin_points.append((component, attachments))
         for att in attachments:
-            graph.add_pin(att)
+            wire_graph.add_pin(att)
 
     for wire in root.find_all("wire"):
         pts = _wire_points(wire)
         uuid = _first_atom(wire.find("uuid"))
         for i in range(len(pts) - 1):
-            graph.add_wire(pts[i], pts[i + 1], uuid=uuid)
+            wire_graph.add_wire(pts[i], pts[i + 1], uuid=uuid)
 
     for poly in root.find_all("polyline"):
-        # Some exports use polyline for bus-like geometry; treat as wires.
+        # Graphical polylines are not electrical buses; keep legacy wire treatment.
         pts = _polyline_points(poly)
         uuid = _first_atom(poly.find("uuid"))
         for i in range(len(pts) - 1):
-            graph.add_wire(pts[i], pts[i + 1], uuid=uuid)
+            wire_graph.add_wire(pts[i], pts[i + 1], uuid=uuid)
+
+    for bus in root.find_all("bus"):
+        pts = _wire_points(bus)
+        uuid = _first_atom(bus.find("uuid"))
+        for i in range(len(pts) - 1):
+            bus_graph.add_wire(pts[i], pts[i + 1], uuid=uuid)
+
+    bus_entries: list[tuple[Point, Point]] = []
+    for entry in root.find_all("bus_entry"):
+        ends = _bus_entry_points(entry)
+        if ends is None:
+            continue
+        a, b = ends
+        # Endpoints participate so labels/wires can attach; association is
+        # recorded separately (no cross-graph UF union of members).
+        wire_graph.add_junction(a)
+        wire_graph.add_junction(b)
+        bus_graph.add_junction(a)
+        bus_graph.add_junction(b)
+        bus_entries.append((a, b))
 
     for jn in root.find_all("junction"):
         at = jn.find("at")
         if at is not None:
             pt = _at_point(at)
             if pt is not None:
-                graph.add_junction(pt)
+                wire_graph.add_junction(pt)
 
     for label in root.find_all("label"):
         name = label.atom_at(0)
@@ -259,14 +306,16 @@ def _normalize_sheet(
         if name and at is not None:
             pt = _at_point(at)
             if pt is not None:
-                graph.add_label(
-                    LabelAttachment(
-                        name=name,
-                        point=pt,
-                        scope="local",
-                        uuid=_first_atom(label.find("uuid")),
-                    )
+                att = LabelAttachment(
+                    name=name,
+                    point=pt,
+                    scope="local",
+                    uuid=_first_atom(label.find("uuid")),
                 )
+                if is_bus_label(name):
+                    bus_graph.add_label(att)
+                else:
+                    wire_graph.add_label(att)
 
     for label in root.find_all("global_label"):
         name = label.atom_at(0)
@@ -274,14 +323,16 @@ def _normalize_sheet(
         if name and at is not None:
             pt = _at_point(at)
             if pt is not None:
-                graph.add_label(
-                    LabelAttachment(
-                        name=name,
-                        point=pt,
-                        scope="global",
-                        uuid=_first_atom(label.find("uuid")),
-                    )
+                att = LabelAttachment(
+                    name=name,
+                    point=pt,
+                    scope="global",
+                    uuid=_first_atom(label.find("uuid")),
                 )
+                if is_bus_label(name):
+                    bus_graph.add_label(att)
+                else:
+                    wire_graph.add_label(att)
 
     for label in root.find_all("hierarchical_label"):
         name = label.atom_at(0)
@@ -289,7 +340,7 @@ def _normalize_sheet(
         if name and at is not None:
             pt = _at_point(at)
             if pt is not None:
-                graph.add_label(
+                wire_graph.add_label(
                     LabelAttachment(
                         name=name,
                         point=pt,
@@ -302,7 +353,7 @@ def _normalize_sheet(
     # so parent-side wiring joins the bridge by pin name.
     for ref in sheet_refs:
         for pin_name, (px, py) in ref.pin_points.items():
-            graph.add_label(
+            wire_graph.add_label(
                 LabelAttachment(
                     name=pin_name,
                     point=qpoint(px, py),
@@ -316,7 +367,7 @@ def _normalize_sheet(
         if component.reference.startswith("#PWR") or component.attributes.get("power_symbol"):
             net_name = component.value or component.reference
             for att in attachments:
-                graph.add_label(
+                wire_graph.add_label(
                     LabelAttachment(
                         name=net_name,
                         point=att.point,
@@ -326,35 +377,9 @@ def _normalize_sheet(
                 )
 
     fragments: list[_SheetNetFragment] = []
-    for group in graph.net_groups():
-        pins: list[PinAttachment] = group["pins"]
-        labels: list[LabelAttachment] = group["labels"]
-        if not pins and not labels:
-            continue
-        endpoints = [
-            Endpoint(
-                component_ref=p.component_ref,
-                pin_number=p.pin_number,
-                pin_name=p.pin_name,
-            )
-            for p in sorted(pins, key=lambda p: (p.component_ref, p.pin_number))
-        ]
-        seen: set[tuple[str, str]] = set()
-        uniq: list[Endpoint] = []
-        for ep in endpoints:
-            key = (ep.component_ref, ep.pin_number)
-            if key in seen:
-                continue
-            seen.add(key)
-            uniq.append(ep)
-        fragments.append(
-            _SheetNetFragment(
-                sheet_path=sheet_path,
-                endpoints=uniq,
-                labels=list(labels),
-                name_hint=_choose_net_name(labels, pins),
-            )
-        )
+    fragments.extend(_fragments_from_graph(wire_graph, sheet_path=sheet_path, is_bus=False))
+    fragments.extend(_fragments_from_graph(bus_graph, sheet_path=sheet_path, is_bus=True))
+    _annotate_bus_entry_membership(fragments, bus_entries, wire_graph, bus_graph)
 
     return _SheetNormalizeResult(
         sheet_path=sheet_path,
@@ -380,6 +405,7 @@ def _design_from_sheets(
 
     root = sheets[0]
     components = [c for s in sheets for c in s.components]
+    _qualify_reused_symbol_uuids(components)
     all_fragments = [f for s in sheets for f in s.fragments]
     nets = _merge_hierarchy_nets(
         all_fragments,
@@ -450,17 +476,34 @@ def _merge_hierarchy_nets(
                 uf.union(prev, i)
 
     # Hierarchical sheet-pin ↔ child hierarchical_label bridges.
-    def _hier_index(sheet_path: str, name: str) -> list[int]:
+    # Parent hits are scoped to the specific sheet-pin point so multiple
+    # same-named pins on one parent (shared-sheet reuse) do not collapse.
+    def _hier_index(
+        sheet_path: str,
+        name: str,
+        *,
+        point: tuple[float, float] | None = None,
+    ) -> list[int]:
         hits: list[int] = []
+        target = qpoint(point[0], point[1]) if point is not None else None
         for i, frag in enumerate(fragments):
             if frag.sheet_path != sheet_path:
                 continue
-            if any(lb.scope == "hierarchical" and lb.name == name for lb in frag.labels):
+            for lb in frag.labels:
+                if lb.scope != "hierarchical" or lb.name != name:
+                    continue
+                if target is not None and lb.point != target:
+                    continue
                 hits.append(i)
+                break
         return hits
 
     for bridge in bridges:
-        parent_hits = _hier_index(bridge.parent_sheet_path, bridge.pin_name)
+        parent_hits = _hier_index(
+            bridge.parent_sheet_path,
+            bridge.pin_name,
+            point=bridge.pin_point,
+        )
         child_hits = _hier_index(bridge.child_sheet_path, bridge.pin_name)
         for p in parent_hits:
             for c in child_hits:
@@ -498,16 +541,39 @@ def _merge_hierarchy_nets(
             else:
                 name = f"Net-{anonymous_i}"
 
+        is_bus = any(f.is_bus for f in frags) or is_bus_label(name)
+        bus_members: list[str] = []
+        for f in frags:
+            for m in f.bus_members:
+                if m not in bus_members:
+                    bus_members.append(m)
+        if is_bus and not bus_members:
+            expanded = expand_bus_members(name)
+            if expanded:
+                bus_members = expanded
+
+        bus_parent = next((f.bus_name for f in frags if f.bus_name), None)
+
         uuid_seed = f"{design_id}:{name}:" + ",".join(
             f"{e.component_ref}.{e.pin_number}" for e in uniq
         )
+        constraints: list[Constraint] = []
+        if bus_members:
+            constraints.append(
+                Constraint(name="bus_members", operator="in", value=list(bus_members))
+            )
+        if bus_parent:
+            constraints.append(
+                Constraint(name="bus", operator="eq", value=bus_parent)
+            )
         nets.append(
             Net(
                 name=name,
                 endpoints=uniq,
-                net_class=_infer_net_class(name, labels),
+                net_class=_infer_net_class(name, labels, is_bus=is_bus),
                 voltage_domain=_infer_voltage_domain(name),
                 uuid=str(uuid5(_NET_NS, uuid_seed)),
+                constraints=constraints,
             )
         )
 
@@ -551,7 +617,14 @@ def _choose_net_name(labels: list[LabelAttachment], pins: list[PinAttachment]) -
     return labels_sorted[0].name
 
 
-def _infer_net_class(name: str, labels: list[LabelAttachment]) -> NetClass:
+def _infer_net_class(
+    name: str,
+    labels: list[LabelAttachment],
+    *,
+    is_bus: bool = False,
+) -> NetClass:
+    if is_bus or is_bus_label(name):
+        return NetClass.BUS
     upper = name.upper()
     if upper in {"GND", "AGND", "DGND", "VSS", "PGND"} or upper.startswith("GND"):
         return NetClass.GROUND
@@ -650,7 +723,11 @@ def _symbol_instance_to_component(
         return None, []
     lib_id = lib_id_node.atom_at(0) or ""
     props = _properties(sym)
-    reference = props.get("Reference") or props.get("reference")
+    property_reference = props.get("Reference") or props.get("reference")
+    # Hierarchy walk path is authoritative; instances block supplies per-instance ref.
+    reference = symbol_instance_reference(
+        sym, sheet_path=sheet_path, fallback=property_reference
+    )
     if not reference:
         return None, []
 
@@ -667,7 +744,9 @@ def _symbol_instance_to_component(
     mirror_x = any(c.head == "mirror" and c.atom_at(0) == "x" for c in sym.children if isinstance(c, SExprNode))
     mirror_y = any(c.head == "mirror" and c.atom_at(0) == "y" for c in sym.children if isinstance(c, SExprNode))
 
-    uuid = _first_atom(sym.find("uuid")) or str(uuid5(_NET_NS, f"comp:{reference}:{lib_id}:{ix}:{iy}"))
+    uuid = _first_atom(sym.find("uuid")) or str(
+        uuid5(_NET_NS, f"comp:{reference}:{lib_id}:{ix}:{iy}:{sheet_path}")
+    )
     value = props.get("Value")
     footprint = props.get("Footprint") or None
     if footprint == "":
@@ -677,8 +756,6 @@ def _symbol_instance_to_component(
     # lib_symbols mark power symbols with (power); instances inherit via lib_id prefix.
     if lib_id.startswith("power:"):
         is_power = True
-
-    resolved_sheet = symbol_instance_sheet_path(sym, default=sheet_path)
 
     pin_defs = lib_pins.get(lib_id, [])
     # Fall back to instance pin numbers if library missing.
@@ -726,7 +803,7 @@ def _symbol_instance_to_component(
             )
         )
 
-    attributes: dict = {"lib_id": lib_id, "sheet_path": resolved_sheet}
+    attributes: dict = {"lib_id": lib_id, "sheet_path": sheet_path}
     if is_power:
         attributes["power_symbol"] = True
     mpn = props.get("MPN") or props.get("Manufacturer_Part_Number")
@@ -744,7 +821,7 @@ def _symbol_instance_to_component(
             uuid=uuid,
             x=ix,
             y=iy,
-            sheet=resolved_sheet,
+            sheet=sheet_path,
             path=file_path,
         ),
         uuid=uuid,
@@ -797,6 +874,142 @@ def _infer_functional_class(reference: str, lib_id: str) -> FunctionalClass:
         if pattern.match(reference):
             return cls
     return FunctionalClass.OTHER
+
+
+def _fragments_from_graph(
+    graph: ConnectivityGraph,
+    *,
+    sheet_path: str,
+    is_bus: bool,
+) -> list[_SheetNetFragment]:
+    fragments: list[_SheetNetFragment] = []
+    for group in graph.net_groups():
+        pins: list[PinAttachment] = group["pins"]
+        labels: list[LabelAttachment] = group["labels"]
+        if not pins and not labels:
+            continue
+        endpoints = [
+            Endpoint(
+                component_ref=p.component_ref,
+                pin_number=p.pin_number,
+                pin_name=p.pin_name,
+            )
+            for p in sorted(pins, key=lambda p: (p.component_ref, p.pin_number))
+        ]
+        seen: set[tuple[str, str]] = set()
+        uniq: list[Endpoint] = []
+        for ep in endpoints:
+            key = (ep.component_ref, ep.pin_number)
+            if key in seen:
+                continue
+            seen.add(key)
+            uniq.append(ep)
+        name_hint = _choose_net_name(labels, pins)
+        members: list[str] = []
+        if is_bus and name_hint:
+            expanded = expand_bus_members(name_hint)
+            if expanded:
+                members = expanded
+        elif is_bus:
+            for lb in labels:
+                expanded = expand_bus_members(lb.name)
+                if expanded:
+                    members = expanded
+                    if name_hint is None:
+                        name_hint = lb.name
+                    break
+        fragments.append(
+            _SheetNetFragment(
+                sheet_path=sheet_path,
+                endpoints=uniq,
+                labels=list(labels),
+                name_hint=name_hint,
+                is_bus=is_bus or bool(members),
+                bus_members=members,
+            )
+        )
+    return fragments
+
+
+def _annotate_bus_entry_membership(
+    fragments: list[_SheetNetFragment],
+    bus_entries: list[tuple[Point, Point]],
+    wire_graph: ConnectivityGraph,
+    bus_graph: ConnectivityGraph,
+) -> None:
+    """Mark wire nets that attach to a bus when their name matches a bus member."""
+    if not bus_entries:
+        return
+
+    wire_by_root: dict[Point, _SheetNetFragment] = {}
+    bus_by_root: dict[Point, _SheetNetFragment] = {}
+    for frag in fragments:
+        graph = bus_graph if frag.is_bus else wire_graph
+        index = bus_by_root if frag.is_bus else wire_by_root
+        for lb in frag.labels:
+            if graph.uf.has(lb.point):
+                index[graph.uf.find(lb.point)] = frag
+        for pin in graph.pins:
+            if any(
+                ep.component_ref == pin.component_ref and ep.pin_number == pin.pin_number
+                for ep in frag.endpoints
+            ):
+                if graph.uf.has(pin.point):
+                    index[graph.uf.find(pin.point)] = frag
+
+    for a, b in bus_entries:
+        for wire_pt, bus_pt in ((a, b), (b, a)):
+            if not wire_graph.uf.has(wire_pt) or not bus_graph.uf.has(bus_pt):
+                continue
+            wfrag = wire_by_root.get(wire_graph.uf.find(wire_pt))
+            bfrag = bus_by_root.get(bus_graph.uf.find(bus_pt))
+            if wfrag is None or bfrag is None:
+                continue
+            bus_name = bfrag.name_hint
+            members = list(bfrag.bus_members)
+            if bus_name and not members:
+                members = expand_bus_members(bus_name) or []
+            if not bus_name or not members:
+                continue
+            wire_name = wfrag.name_hint
+            if wire_name and wire_name in members:
+                wfrag.bus_name = bus_name
+
+
+def _qualify_reused_symbol_uuids(components: list[Component]) -> None:
+    """When the same CAD uuid is instantiated on multiple sheets, qualify IR uuids."""
+    by_uuid: dict[str, list[Component]] = {}
+    for comp in components:
+        by_uuid.setdefault(comp.uuid, []).append(comp)
+    for cad_uuid, group in by_uuid.items():
+        sheets = {
+            (c.source_location.sheet if c.source_location else None) for c in group
+        }
+        if len(group) < 2 or len(sheets) < 2:
+            continue
+        for comp in group:
+            sheet = comp.source_location.sheet if comp.source_location else "/"
+            new_uuid = str(uuid5(_NET_NS, f"instance:{sheet}:{cad_uuid}"))
+            if comp.source_location is not None:
+                comp.source_location.uuid = cad_uuid
+            comp.attributes = {**comp.attributes, "cad_uuid": cad_uuid}
+            comp.uuid = new_uuid
+
+
+def _bus_entry_points(entry: SExprNode) -> tuple[Point, Point] | None:
+    """Return (at, at+size) endpoints for a bus_entry."""
+    at = entry.find("at")
+    size = entry.find("size")
+    if at is None or size is None:
+        return None
+    try:
+        x = float(at.atom_at(0) or 0)
+        y = float(at.atom_at(1) or 0)
+        dx = float(size.atom_at(0) or 0)
+        dy = float(size.atom_at(1) or 0)
+    except ValueError:
+        return None
+    return qpoint(x, y), qpoint(x + dx, y + dy)
 
 
 def _wire_points(wire: SExprNode) -> list[Point]:

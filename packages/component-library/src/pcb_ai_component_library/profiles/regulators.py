@@ -210,4 +210,88 @@ PROFILES: list[ComponentProfile] = [
             )
         ],
     ),
+    ComponentProfile(
+        manufacturer="Microchip Technology",
+        orderable_mpn="MCP1700-3302E/TO",
+        functional_class=FunctionalClass.REGULATOR_LDO,
+        symbol_ref="Regulator_Linear:MCP1700-3.3",
+        footprint_ref="Package_TO_SOT_THT:TO-92_Inline",
+        pins=[
+            Pin(number="1", name="GND", electrical_role=ElectricalRole.GROUND, voltage_domain="GND"),
+            Pin(number="2", name="VOUT", electrical_role=ElectricalRole.POWER_OUT, voltage_domain="3V3"),
+            Pin(number="3", name="VIN", electrical_role=ElectricalRole.POWER_IN, voltage_domain="5V"),
+        ],
+        absolute_maximum=[
+            Constraint(name="vin", operator="lte", value=6.5, unit="V"),
+            Constraint(name="iout", operator="lte", value=0.25, unit="A"),
+        ],
+        recommended_operating=[
+            Constraint(name="vin", operator="between", value=[3.5, 6.0], unit="V", notes="for 3.3 V fixed"),
+            Constraint(name="iout", operator="lte", value=0.25, unit="A"),
+        ],
+        supply_domains=["5V", "3V3", "GND"],
+        required_support_components=["input_cap_1uF", "output_cap_1uF"],
+        recommended_support_components=["ceramic_x7r_caps"],
+        boot_reset_config=[],
+        interface_characteristics={
+            "dropout": "~178 mV typical at 250 mA",
+            "output": "fixed 3.3 V",
+            "quiescent": "~1.6 uA typical",
+        },
+        approved_reference_circuits=["microchip:mcp1700_typical"],
+        simulation_model_refs=[],
+        evidence_refs=[
+            EvidenceRef(
+                id="ds:mcp1700",
+                kind="datasheet",
+                title="MCP1700 Low Quiescent Current LDO",
+                uri="https://ww1.microchip.com/downloads/aemDocuments/documents/APID/ProductDocuments/DataSheets/20001826E.pdf",
+                page=1,
+                confidence=0.85,
+            )
+        ],
+    ),
+    ComponentProfile(
+        manufacturer="Texas Instruments",
+        orderable_mpn="LP2985-33DBVR",
+        functional_class=FunctionalClass.REGULATOR_LDO,
+        symbol_ref="Regulator_Linear:LP2985-3.3",
+        footprint_ref="Package_TO_SOT_SMD:SOT-23-5",
+        pins=[
+            Pin(number="1", name="VIN", electrical_role=ElectricalRole.POWER_IN, voltage_domain="5V"),
+            Pin(number="2", name="GND", electrical_role=ElectricalRole.GROUND, voltage_domain="GND"),
+            Pin(number="3", name="ON/OFF", electrical_role=ElectricalRole.ENABLE, voltage_domain="5V"),
+            Pin(number="4", name="BYPASS", electrical_role=ElectricalRole.PASSIVE, interface_role="noise_bypass"),
+            Pin(number="5", name="VOUT", electrical_role=ElectricalRole.POWER_OUT, voltage_domain="3V3"),
+        ],
+        absolute_maximum=[
+            Constraint(name="vin", operator="lte", value=16, unit="V"),
+            Constraint(name="iout", operator="lte", value=0.15, unit="A"),
+        ],
+        recommended_operating=[
+            Constraint(name="vin", operator="between", value=[3.8, 16], unit="V", notes="for 3.3 V fixed"),
+            Constraint(name="iout", operator="lte", value=0.15, unit="A"),
+        ],
+        supply_domains=["5V", "3V3", "GND"],
+        required_support_components=["input_cap_1uF", "output_cap_2u2_or_greater"],
+        recommended_support_components=["bypass_cap_10nF", "on_tie_to_vin"],
+        boot_reset_config=["ON/OFF high enables; pull low for shutdown"],
+        interface_characteristics={
+            "dropout": "~280 mV typical at 150 mA",
+            "output": "fixed 3.3 V",
+            "noise": "low-noise with BYPASS capacitor",
+        },
+        approved_reference_circuits=["ti:lp2985_typical"],
+        simulation_model_refs=[],
+        evidence_refs=[
+            EvidenceRef(
+                id="ds:lp2985-33",
+                kind="datasheet",
+                title="LP2985 150-mA Low-Noise LDO",
+                uri="https://www.ti.com/lit/ds/symlink/lp2985.pdf",
+                page=1,
+                confidence=0.85,
+            )
+        ],
+    ),
 ]

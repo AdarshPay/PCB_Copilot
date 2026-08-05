@@ -5,6 +5,7 @@ description = "LLM planner prompts and structured tool interfaces"
 requires-python = ">=3.12"
 dependencies = [
   "pcb-ai-circuit-ir",
+  "pydantic>=2.10",
 ]
 
 [build-system]

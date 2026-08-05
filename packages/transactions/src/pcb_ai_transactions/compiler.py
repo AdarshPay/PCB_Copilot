@@ -3,7 +3,8 @@
 Guardrails
 ----------
 * Production CAD mutation is forbidden. Operations compile into an in-memory IR
-  snapshot (and later a temporary KiCad branch) only after human approval.
+  snapshot; use ``compile_temp_branch`` for a temporary ``.kicad_sch`` under a
+  dest directory. Human approval is still required before any production write.
 * ``apply_operations`` always deep-copies the input Design; the caller's original
   is never mutated.
 * Unsupported operation types raise ``TransactionError`` rather than silently
@@ -342,7 +343,9 @@ def export_branch_diff(
 ) -> dict[str, Any]:
     """Semantic before/after summary for a temp-branch review artifact.
 
-    Explicitly records that production CAD was not mutated — IR-level apply only.
+    Explicitly records that production CAD was not mutated. Pair with
+    ``compile_temp_branch`` when a temporary ``.kicad_sch`` artifact is needed;
+    human approval is still required before any production write.
     """
     diff = semantic_diff(before, after)
     ops = list(operations or [])

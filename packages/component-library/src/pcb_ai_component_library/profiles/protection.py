@@ -132,4 +132,47 @@ PROFILES: list[ComponentProfile] = [
             )
         ],
     ),
+    ComponentProfile(
+        manufacturer="Texas Instruments",
+        orderable_mpn="TPD2E001DRLR",
+        functional_class=FunctionalClass.PROTECTION,
+        symbol_ref="Power_Protection:TPD2E001",
+        footprint_ref="Package_TO_SOT_SMD:SOT-553",
+        pins=[
+            Pin(number="1", name="IO1", electrical_role=ElectricalRole.PASSIVE, interface_role="esd_io1", voltage_domain="SIGNAL"),
+            Pin(number="2", name="IO2", electrical_role=ElectricalRole.PASSIVE, interface_role="esd_io2", voltage_domain="SIGNAL"),
+            Pin(number="3", name="GND", electrical_role=ElectricalRole.GROUND, voltage_domain="GND"),
+            Pin(number="4", name="VCC", electrical_role=ElectricalRole.POWER_IN, voltage_domain="5V"),
+            Pin(number="5", name="NC", electrical_role=ElectricalRole.NO_CONNECT),
+        ],
+        absolute_maximum=[
+            Constraint(name="vcc", operator="lte", value=5.5, unit="V"),
+            Constraint(name="io_voltage", operator="between", value=[-0.5, 5.5], unit="V"),
+        ],
+        recommended_operating=[
+            Constraint(name="vcc", operator="between", value=[0.9, 5.5], unit="V"),
+        ],
+        supply_domains=["5V", "SIGNAL", "GND"],
+        required_support_components=["vcc_decoupling_100nF"],
+        recommended_support_components=["place_at_connector_entry"],
+        boot_reset_config=[],
+        interface_characteristics={
+            "channels": "2-line ESD array",
+            "capacitance": "~1.5 pF typical",
+            "standard": "IEC 61000-4-2 Level 4",
+            "use": "USB / UART / GPIO ESD",
+        },
+        approved_reference_circuits=["ti:tpd2e001_typical"],
+        simulation_model_refs=[],
+        evidence_refs=[
+            EvidenceRef(
+                id="ds:tpd2e001",
+                kind="datasheet",
+                title="TPD2E001 Low-Capacitance ESD Protection",
+                uri="https://www.ti.com/lit/ds/symlink/tpd2e001.pdf",
+                page=1,
+                confidence=0.85,
+            )
+        ],
+    ),
 ]

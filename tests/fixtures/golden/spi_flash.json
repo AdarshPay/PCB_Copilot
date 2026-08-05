@@ -1,0 +1,248 @@
+{
+  "id": "fixture.spi_flash",
+  "source_tool": "synthetic",
+  "source_version": "fixture-0.1",
+  "revision": "1",
+  "name": "MCU plus SPI NOR flash",
+  "requirements": [
+    {
+      "id": "req.spi_flash",
+      "text": "W25Q32 connects to MCU over SPI (SCK/MOSI/MISO/CS) with shared 3V3 and GND.",
+      "priority": "must"
+    }
+  ],
+  "blocks": [
+    {
+      "id": "blk.mcu",
+      "name": "MCU",
+      "component_refs": ["U1"]
+    },
+    {
+      "id": "blk.flash",
+      "name": "SPI Flash",
+      "component_refs": ["U2"]
+    }
+  ],
+  "components": [
+    {
+      "reference": "U1",
+      "manufacturer_part_number": "RP2040",
+      "value": "RP2040",
+      "functional_class": "mcu",
+      "symbol_ref": "MCU_RaspberryPi:RP2040",
+      "footprint_ref": "Package_DFN_QFN:QFN-56-1EP_7x7mm_P0.4mm",
+      "pins": [
+        {
+          "number": "1",
+          "name": "GPIO0",
+          "electrical_role": "digital_out",
+          "interface_role": "spi_sck",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "2",
+          "name": "GPIO1",
+          "electrical_role": "digital_out",
+          "interface_role": "spi_mosi",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "3",
+          "name": "GPIO2",
+          "electrical_role": "digital_in",
+          "interface_role": "spi_miso",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "4",
+          "name": "GPIO3",
+          "electrical_role": "digital_out",
+          "interface_role": "spi_cs",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "5",
+          "name": "VDD",
+          "electrical_role": "power_in",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "6",
+          "name": "GND",
+          "electrical_role": "ground",
+          "voltage_domain": "GND"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000a1"
+    },
+    {
+      "reference": "U2",
+      "manufacturer_part_number": "W25Q32JV",
+      "value": "W25Q32JV",
+      "functional_class": "other",
+      "symbol_ref": "Memory_Flash:W25Q32JV",
+      "footprint_ref": "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+      "pins": [
+        {
+          "number": "1",
+          "name": "CS",
+          "electrical_role": "digital_in",
+          "interface_role": "spi_cs",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "2",
+          "name": "DO",
+          "electrical_role": "digital_out",
+          "interface_role": "spi_miso",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "3",
+          "name": "DI",
+          "electrical_role": "digital_in",
+          "interface_role": "spi_mosi",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "4",
+          "name": "CLK",
+          "electrical_role": "digital_in",
+          "interface_role": "spi_sck",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "5",
+          "name": "VCC",
+          "electrical_role": "power_in",
+          "voltage_domain": "3V3"
+        },
+        {
+          "number": "6",
+          "name": "GND",
+          "electrical_role": "ground",
+          "voltage_domain": "GND"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000a2"
+    }
+  ],
+  "nets": [
+    {
+      "name": "3V3",
+      "class": "power",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "5"
+        },
+        {
+          "component_ref": "U2",
+          "pin_number": "5"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000b1"
+    },
+    {
+      "name": "GND",
+      "class": "ground",
+      "voltage_domain": "GND",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "6"
+        },
+        {
+          "component_ref": "U2",
+          "pin_number": "6"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000b2"
+    },
+    {
+      "name": "SPI_SCK",
+      "class": "signal",
+      "protocol": "spi",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "1"
+        },
+        {
+          "component_ref": "U2",
+          "pin_number": "4"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000b3"
+    },
+    {
+      "name": "SPI_MOSI",
+      "class": "signal",
+      "protocol": "spi",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "2"
+        },
+        {
+          "component_ref": "U2",
+          "pin_number": "3"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000b4"
+    },
+    {
+      "name": "SPI_MISO",
+      "class": "signal",
+      "protocol": "spi",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U2",
+          "pin_number": "2"
+        },
+        {
+          "component_ref": "U1",
+          "pin_number": "3"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000b5"
+    },
+    {
+      "name": "SPI_CS",
+      "class": "signal",
+      "protocol": "spi",
+      "voltage_domain": "3V3",
+      "endpoints": [
+        {
+          "component_ref": "U1",
+          "pin_number": "4"
+        },
+        {
+          "component_ref": "U2",
+          "pin_number": "1"
+        }
+      ],
+      "uuid": "00000000-0000-4000-8000-0000000000b6"
+    }
+  ],
+  "assertions": [
+    {
+      "id": "assert.spi_flash",
+      "kind": "interface",
+      "expression": "MCU drives SCK/MOSI/CS; flash drives MISO",
+      "severity": "error"
+    }
+  ],
+  "evidence_refs": [
+    {
+      "id": "fixture:spi_flash",
+      "kind": "fixture",
+      "title": "Golden MCU + SPI NOR flash",
+      "confidence": 1.0
+    }
+  ]
+}

@@ -15,6 +15,7 @@ from tests.mutation.ir_mutators import (
     mutate_missing_power_source,
     mutate_output_conflict,
     mutate_reversed_polarity,
+    mutate_undriven_enable,
     mutate_undriven_input,
     mutate_voltage_domain_conflict,
 )
@@ -29,6 +30,7 @@ CLEAN_GOLDENS = (
     "esd_connector.json",
     "buck_regulator.json",
     "programming_header.json",
+    "spi_flash.json",
 )
 
 
@@ -50,6 +52,7 @@ def test_clean_goldens_have_no_first_pack_findings(name: str) -> None:
         (mutate_missing_footprint, "struct.footprint_presence"),
         (mutate_output_conflict, "elec.output_conflict"),
         (mutate_undriven_input, "elec.undriven_input"),
+        (mutate_undriven_enable, "elec.undriven_input"),
         (mutate_missing_power_source, "elec.power_source"),
         (mutate_missing_open_drain_pullup, "elec.open_drain_pullup"),
         (mutate_voltage_domain_conflict, "elec.voltage_domain"),
@@ -61,6 +64,7 @@ def test_clean_goldens_have_no_first_pack_findings(name: str) -> None:
         "footprint_presence",
         "output_conflict",
         "undriven_input",
+        "undriven_enable",
         "power_source",
         "open_drain_pullup",
         "voltage_domain",
@@ -80,6 +84,7 @@ def test_clean_goldens_have_no_first_pack_findings(name: str) -> None:
         "esd_connector",
         "buck_regulator",
         "programming_header",
+        "spi_flash",
     ],
 )
 def test_single_fault_fires_expected_rule(mutator, expected_rule: str, base: str) -> None:

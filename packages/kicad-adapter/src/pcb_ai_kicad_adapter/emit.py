@@ -1,11 +1,16 @@
 """Emit a minimal KiCad schematic S-expression from Circuit IR.
 
 Produces a simplified but connectivity-faithful `.kicad_sch` suitable for
-semantic round-trip tests (normalize → emit → normalize). Geometry is synthetic
-and not intended for interactive editing in KiCad.
+semantic round-trip tests (normalize → emit → normalize). Geometry prefers
+`SourceLocation` coordinates when present; otherwise uses a synthetic grid.
+Emits `(instances …)` sheet paths and `(sheet_instances …)` from IR blocks /
+component locations. Full multi-sheet hierarchy rewrite (child files, sheet
+symbols, hierarchical pins) is not implemented — see tests/roundtrip/README.md.
 """
 
 from __future__ import annotations
+
+from pathlib import Path
 
 from pcb_ai_circuit_ir.models import Design, ElectricalRole, NetClass
 from pcb_ai_kicad_adapter.parser import SExprNode, dump_schematic_sexpr
@@ -32,7 +37,6 @@ _ROLE_TO_KICAD = {
 
 def emit_schematic_ast(design: Design) -> SExprNode:
     """Build a `kicad_sch` AST that preserves component/pin/net semantics."""
-    # Layout: place components on a grid; draw wires for nets between pin points.
     lib_symbols = _build_lib_symbols(design)
     children: list[SExprNode] = [
         SExprNode(head="version", children=[SExprNode(atom=design.source_version or "20250114")]),
@@ -46,16 +50,28 @@ def emit_schematic_ast(design: Design) -> SExprNode:
         lib_symbols,
     ]
 
-    # Assign positions: each component gets a column.
     pin_points: dict[tuple[str, str], tuple[float, float]] = {}
     spacing_x = 40.0
     for idx, component in enumerate(design.components):
-        origin_x = 50.0 + idx * spacing_x
-        origin_y = 80.0
+        if (
+            component.source_location is not None
+            and component.source_location.x is not None
+            and component.source_location.y is not None
+        ):
+            origin_x = float(component.source_location.x)
+            origin_y = float(component.source_location.y)
+        else:
+            origin_x = 50.0 + idx * spacing_x
+            origin_y = 80.0
+        sheet_path = "/"
+        if component.source_location and component.source_location.sheet:
+            sheet_path = component.source_location.sheet
+        elif component.attributes.get("sheet_path"):
+            sheet_path = str(component.attributes["sheet_path"])
+
         lib_id = component.symbol_ref or f"Synthetic:{component.reference}"
         pin_nodes: list[SExprNode] = []
         for p_i, pin in enumerate(component.pins):
-            # Match emit library pin local coords: pin i at (0, 5 - i*5) roughly
             local_y = 5.0 - p_i * 5.0
             wx, wy = origin_x, origin_y + local_y
             pin_points[(component.reference, pin.number)] = (wx, wy)
@@ -85,12 +101,79 @@ def emit_schematic_ast(design: Design) -> SExprNode:
             _property("Value", component.value or component.reference),
             _property("Footprint", component.footprint_ref or ""),
             *pin_nodes,
+            SExprNode(
+                head="instances",
+                children=[
+                    SExprNode(
+                        head="project",
+                        children=[
+                            SExprNode(atom=""),
+                            SExprNode(
+                                head="path",
+                                children=[
+                                    SExprNode(atom=sheet_path),
+                                    SExprNode(
+                                        head="reference",
+                                        children=[SExprNode(atom=component.reference)],
+                                    ),
+                                    SExprNode(head="unit", children=[SExprNode(atom="1")]),
+                                ],
+                            ),
+                        ],
+                    )
+                ],
+            ),
         ]
         children.append(SExprNode(head="symbol", children=sym_children))
+
 
     # For each net: place a label at the first endpoint and wire all endpoints together.
     for n_i, net in enumerate(design.nets):
         if not net.endpoints:
+            # Bus nets may have members only (no pin endpoints).
+            if net.net_class == NetClass.BUS:
+                hub = (30.0 + n_i * 10.0, 30.0)
+                children.append(
+                    SExprNode(
+                        head="bus",
+                        children=[
+                            SExprNode(
+                                head="pts",
+                                children=[
+                                    SExprNode(
+                                        head="xy",
+                                        children=[SExprNode(atom=str(hub[0])), SExprNode(atom=str(hub[1]))],
+                                    ),
+                                    SExprNode(
+                                        head="xy",
+                                        children=[
+                                            SExprNode(atom=str(hub[0] + 20.0)),
+                                            SExprNode(atom=str(hub[1])),
+                                        ],
+                                    ),
+                                ],
+                            ),
+                            SExprNode(head="uuid", children=[SExprNode(atom=f"{net.uuid}-bus")]),
+                        ],
+                    )
+                )
+                children.append(
+                    SExprNode(
+                        head="label",
+                        children=[
+                            SExprNode(atom=net.name),
+                            SExprNode(
+                                head="at",
+                                children=[
+                                    SExprNode(atom=str(hub[0] + 10.0)),
+                                    SExprNode(atom=str(hub[1])),
+                                    SExprNode(atom="0"),
+                                ],
+                            ),
+                            SExprNode(head="uuid", children=[SExprNode(atom=net.uuid)]),
+                        ],
+                    )
+                )
             continue
         pts: list[tuple[float, float]] = []
         for ep in net.endpoints:
@@ -115,7 +198,12 @@ def emit_schematic_ast(design: Design) -> SExprNode:
                 ],
             )
         )
-        label_head = "global_label" if net.net_class in {NetClass.POWER, NetClass.GROUND} else "label"
+        if net.net_class == NetClass.BUS:
+            label_head = "label"
+        elif net.net_class in {NetClass.POWER, NetClass.GROUND}:
+            label_head = "global_label"
+        else:
+            label_head = "label"
         children.append(
             SExprNode(
                 head=label_head,
@@ -134,11 +222,56 @@ def emit_schematic_ast(design: Design) -> SExprNode:
             )
         )
 
+    sheet_paths = _collect_sheet_paths(design)
+    if sheet_paths:
+        path_nodes = [
+            SExprNode(
+                head="path",
+                children=[
+                    SExprNode(atom=path),
+                    SExprNode(head="page", children=[SExprNode(atom=str(i + 1))]),
+                ],
+            )
+            for i, path in enumerate(sheet_paths)
+        ]
+        children.append(SExprNode(head="sheet_instances", children=path_nodes))
+
     return SExprNode(head="kicad_sch", children=children)
 
 
 def emit_schematic_text(design: Design) -> str:
     return dump_schematic_sexpr(emit_schematic_ast(design))
+
+
+def write_schematic(design: Design, path: str | Path) -> Path:
+    """Write a connectivity-faithful `.kicad_sch` for `design` to `path`."""
+    out = Path(path)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(emit_schematic_text(design), encoding="utf-8")
+    return out
+
+
+def _collect_sheet_paths(design: Design) -> list[str]:
+    paths: list[str] = []
+    seen: set[str] = set()
+
+    def add(path: str | None) -> None:
+        if not path or path in seen:
+            return
+        seen.add(path)
+        paths.append(path)
+
+    add("/")
+    for block in design.blocks:
+        if block.description and "sheet_path=" in block.description:
+            raw = block.description.split("sheet_path=", 1)[1].split(";", 1)[0].strip()
+            add(raw)
+        elif block.id and block.id.startswith("/"):
+            add(block.id)
+    for component in design.components:
+        if component.source_location and component.source_location.sheet:
+            add(component.source_location.sheet)
+    return paths
 
 
 def _build_lib_symbols(design: Design) -> SExprNode:
