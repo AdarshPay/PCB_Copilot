@@ -25,4 +25,13 @@ Phase A MVP architecture, Circuit IR, rule pack, and foundations → layout → 
 - Connectivity merges global/power labels across sheets and bridges parent sheet pins to child `hierarchical_label`s by name.
 - Buses: `(bus)` / `(bus_entry)` stay on a separate connectivity graph from wires; vector/group labels expand to members (`bus_members` / `bus` constraints). Members are not shorted together.
 - AST serialize preserves UUID atoms; `uuid_fingerprint` / `uuid_equal` assert component UUID survival through emit.
-- Fixtures: `tests/fixtures/kicad/hierarchy/`, `shared_sheet/`, `bus/`. Emit is connectivity-faithful with partial sheet-path / coordinate preservation — not a lossless multi-file hierarchy writer (see `tests/roundtrip/README.md`).
+- Emit is connectivity-faithful with partial sheet-path / coordinate preservation — not a lossless multi-file hierarchy writer (see `tests/roundtrip/README.md`).
+
+## Phase B layout (in progress / paused)
+
+- Board IR: `packages/pcb-ir`
+- Layout package: `packages/layout` (`NullLayoutBackend`, `GridLayoutBackend` WIP)
+- PCB adapter: `ingest_pcb` / `write_pcb` / `schematic_design_to_board_skeleton`
+- DRC: `parse_drc_report` / `run_board_drc` (offline fixture path)
+- Status and resume checklist: `docs/phase-b.md`
+

@@ -1,0 +1,16 @@
+{
+  "violations": [
+    {
+      "type": "clearance",
+      "severity": "error",
+      "description": "Fixture clearance violation (offline DRC seed)",
+      "items": [{"description": "R1 pad 1"}, {"description": "track"}]
+    },
+    {
+      "type": "silk_over_copper",
+      "severity": "warning",
+      "description": "Silk overlaps copper (fixture)",
+      "items": [{"description": "R1 silk"}]
+    }
+  ]
+}

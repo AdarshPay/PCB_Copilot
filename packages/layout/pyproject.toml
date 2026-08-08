@@ -1,0 +1,23 @@
+[project]
+name = "pcb-ai-layout"
+version = "0.1.0"
+description = "Phase B place/route layout agent (deterministic MVP backend)"
+requires-python = ">=3.12"
+dependencies = [
+  "pcb-ai-circuit-ir",
+  "pcb-ai-pcb-ir",
+  "pcb-ai-kicad-adapter",
+  "pcb-ai-verification",
+  "pcb-ai-component-library",
+  "pcb-ai-agent",
+]
+
+[project.scripts]
+pcb-ai-layout = "pcb_ai_layout.__main__:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

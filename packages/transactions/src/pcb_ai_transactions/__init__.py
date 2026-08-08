@@ -4,6 +4,9 @@ Guardrails: never mutates production CAD. Use ``apply_operations`` /
 ``export_branch_diff`` for IR review, or ``compile_temp_branch`` to emit a
 temporary ``.kicad_sch`` under a dest directory (human approval still required
 before any production write).
+
+Phase B ``compile_temp_board_branch`` lives in ``temp_board.py`` (requires
+``pcb-ai-layout``); import it explicitly when needed.
 """
 
 from pcb_ai_transactions.compiler import (

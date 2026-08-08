@@ -1,11 +1,11 @@
 [project]
-name = "pcb-ai-kicad-adapter"
+name = "pcb-ai-pcb-ir"
 version = "0.1.0"
-description = "KiCad S-expression parse, normalize, and compile adapter"
+description = "Typed board / PCB intermediate representation for Phase B layout"
 requires-python = ">=3.12"
 dependencies = [
+  "pydantic>=2.10",
   "pcb-ai-circuit-ir",
-  "pcb-ai-pcb-ir",
 ]
 
 [build-system]
