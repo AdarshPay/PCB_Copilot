@@ -19,13 +19,15 @@ jobs:
         run: |
           python -m pip install -U pip hatchling
           python -m pip install -e packages/circuit-ir
+          python -m pip install -e packages/pcb-ir
           python -m pip install -e packages/evidence -e packages/transactions \
             -e packages/verification -e packages/kicad-adapter -e packages/agent \
             -e packages/simulation -e packages/benchmarks -e packages/component-library
+          python -m pip install -e packages/layout
           python -m pip install -e apps/api -e services/worker
           python -m pip install pytest pytest-asyncio ruff httpx
 
-      - name: CI hardware check (offline)
+      - name: CI hardware check (offline ERC + DRC)
         run: |
           python -m pcb_ai_benchmarks.ci_check \
             -o reports/ci-hardware-check.json \

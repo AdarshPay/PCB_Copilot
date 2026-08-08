@@ -21,11 +21,11 @@ class LayoutNotImplemented(RuntimeError):
 
 
 class NullLayoutBackend:
-    """Stub backend used until B3 GridLayoutBackend is available."""
+    """Explicit stub for tests; production planner defaults to GridLayoutBackend."""
 
     def layout(self, design: Design, board: Board) -> Board:
         raise LayoutNotImplemented(
-            "Layout backend not implemented. Use GridLayoutBackend "
+            "NullLayoutBackend is a stub. Use GridLayoutBackend "
             f"(design={design.id}, footprints={len(board.footprints)})."
         )
 
@@ -34,7 +34,12 @@ class LayoutPlanner:
     """Orchestrates schematic→board skeleton→backend place/route."""
 
     def __init__(self, backend: LayoutBackend | None = None) -> None:
-        self.backend: LayoutBackend = backend or NullLayoutBackend()
+        if backend is None:
+            from pcb_ai_layout.grid_backend import GridLayoutBackend
+
+            self.backend: LayoutBackend = GridLayoutBackend()
+        else:
+            self.backend = backend
 
     def run(self, design: Design, board: Board) -> Board:
         return self.backend.layout(design, board)

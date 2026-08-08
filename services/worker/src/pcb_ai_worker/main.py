@@ -32,6 +32,8 @@ def process_job(payload: dict) -> dict:
         }
     if job_type == "run_erc":
         return _process_run_erc(payload)
+    if job_type == "run_drc":
+        return _process_run_drc(payload)
     return {"type": job_type, "status": "ignored"}
 
 
@@ -103,6 +105,58 @@ def _process_run_erc(payload: dict[str, Any]) -> dict[str, Any]:
 
     return {
         "type": "run_erc",
+        "status": "ok",
+        "mode": result.mode,
+        "report_path": str(result.report_path) if result.report_path else None,
+        "finding_count": len(result.findings),
+        "findings": [f.model_dump(mode="json") for f in result.findings],
+        "returncode": result.returncode,
+    }
+
+
+def _process_run_drc(payload: dict[str, Any]) -> dict[str, Any]:
+    """Async DRC job: parse a report and/or invoke KiCad CLI / Docker.
+
+    Accepted payload keys:
+    - ``drc_report``: inline DRC JSON object
+    - ``report_path``: filesystem path to DRC JSON (offline / mock)
+    - ``board_path``: ``.kicad_pcb`` for live DRC (requires KiCad/Docker)
+    - ``mode``: ``auto`` | ``docker`` | ``local`` | ``mock``
+    """
+    from pcb_ai_verification import parse_drc_report, run_board_drc
+
+    if "drc_report" in payload and payload["drc_report"] is not None:
+        findings = parse_drc_report(payload["drc_report"])
+        return {
+            "type": "run_drc",
+            "status": "ok",
+            "mode": "inline",
+            "finding_count": len(findings),
+            "findings": [f.model_dump(mode="json") for f in findings],
+        }
+
+    report_path = payload.get("report_path")
+    board_path = payload.get("board_path")
+    mode = payload.get("mode")
+
+    if report_path:
+        result = run_board_drc(report_path=report_path, mode=mode)
+    elif board_path:
+        result = run_board_drc(
+            board=board_path,
+            mode=mode,
+            docker_image=payload.get("docker_image"),
+            work_dir=payload.get("work_dir"),
+        )
+    else:
+        return {
+            "type": "run_drc",
+            "status": "error",
+            "error": "run_drc requires drc_report, report_path, and/or board_path",
+        }
+
+    return {
+        "type": "run_drc",
         "status": "ok",
         "mode": result.mode,
         "report_path": str(result.report_path) if result.report_path else None,

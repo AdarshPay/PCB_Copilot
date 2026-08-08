@@ -5,13 +5,13 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from pcb_ai_api.routes import health, ingest, proposals, reviews, temp_branch
+from pcb_ai_api.routes import health, ingest, layout, proposals, reviews, temp_board, temp_branch
 from pcb_ai_api.settings import settings
 
 app = FastAPI(
     title=settings.app_name,
     version="0.1.0",
-    description="Verification-first KiCad schematic review API",
+    description="Verification-first KiCad schematic review + Phase B layout API",
 )
 
 app.add_middleware(
@@ -27,3 +27,5 @@ app.include_router(reviews.router, prefix="/v1")
 app.include_router(proposals.router, prefix="/v1")
 app.include_router(ingest.router, prefix="/v1")
 app.include_router(temp_branch.router, prefix="/v1")
+app.include_router(temp_board.router, prefix="/v1")
+app.include_router(layout.router, prefix="/v1")

@@ -5,24 +5,24 @@
 
 ## Status (stopping point — 2026-08-08)
 
-**Foundation started; full KiCad-open place/route loop not finished.** Phase A remains green (~235 pytest). Resume here rather than redoing B0/B1.
+**B0–B5 done** (layout API/CLI, offline DRC CI, temp board branch, KiCad action plugin). **B6** (layout benchmarks + gated E2E demo checklist) remains. Phase A remains green.
 
 | Workstream | Status |
 |------------|--------|
 | B0 Board IR + layout package skeleton | **Done** (`packages/pcb-ir`, `packages/layout`) |
 | B1 PCB ingest/emit + schematic→board skeleton | **Done** (`pcb.py`, `board_bridge.py`) |
-| B2 DRC parse/runner (offline) | **Partial** — modules + `rc_divider_drc.json`; CI/plugin later |
-| B3 Grid place/route | **WIP** (`GridLayoutBackend`, `run_layout_job`, `__main__.py`) — not API-wired |
-| B4 Temp board branch | **Stub** (`temp_board.py`, explicit import only) |
-| B5 KiCad action plugin | **Not started** |
+| B2 DRC parse/runner (offline) | **Done** — `ci_check` + workflow; live `kicad-cli` optional |
+| B3 Grid place/route | **Done** — CLI `python -m pcb_ai_layout layout …`; `POST /v1/layout` (+ `/from-design`) |
+| B4 Temp board branch | **Done** — `compile_temp_board_branch` lazy re-export; `POST /v1/temp-board` (+ `/from-design`); overwrite guard; decision telemetry |
+| B5 KiCad action plugin | **Done** — `apps/kicad-plugin/pcb_copilot_layout/` + `scripts/install_kicad_plugin.ps1` |
 | B6 Layout benchmarks + E2E demo | **Not started** |
 
 ## Resume next (do in order)
 
-1. Productize `GridLayoutBackend` + `python -m pcb_ai_layout layout <source> --out DIR` + `POST /v1/layout`
-2. Wire offline DRC into CI; optional live `kicad-cli pcb drc`
-3. Re-export `compile_temp_board_branch`; register layout proposals with decision telemetry
-4. KiCad 10 action plugin → local API → approve/reload sidecar `*-copilot.kicad_pcb`
+1. ~~Productize `GridLayoutBackend` + CLI + `POST /v1/layout`~~ **Done**
+2. ~~Wire offline DRC into CI; optional live `kicad-cli pcb drc`~~ **Done**
+3. ~~Re-export `compile_temp_board_branch`; register layout proposals with decision telemetry~~ **Done**
+4. ~~KiCad 10 action plugin → local API → approve/reload sidecar `*-copilot.kicad_pcb`~~ **Done**
 5. Layout benchmarks + Phase B gate checklist in HANDOFF before Phase C
 
 ## MVP outcome (when complete)

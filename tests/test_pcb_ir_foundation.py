@@ -1,4 +1,4 @@
-"""Minimal Phase B foundation tests (pcb-ir + PCB emit/ingest)."""
+"""Minimal Phase B foundation tests (pcb-ir + PCB emit/ingest + grid layout)."""
 
 from __future__ import annotations
 
@@ -9,7 +9,14 @@ from pcb_ai_kicad_adapter import (
     schematic_design_to_board_skeleton,
     write_pcb,
 )
-from pcb_ai_layout import LayoutNotImplemented, LayoutPlanner, NullLayoutBackend
+from pcb_ai_layout import (
+    GridLayoutBackend,
+    LayoutNotImplemented,
+    LayoutPlanner,
+    NullLayoutBackend,
+    load_design_from_source,
+    run_layout_job,
+)
 from pcb_ai_pcb_ir import Board, LAYOUT_OPERATION_TYPES
 from pcb_ai_verification import parse_drc_report
 from tests.conftest import load_golden
@@ -27,9 +34,41 @@ def test_null_layout_backend_raises() -> None:
     planner = LayoutPlanner(NullLayoutBackend())
     try:
         planner.run(design, board)
-        raise AssertionError("expected LayoutNotImplemented")
     except LayoutNotImplemented:
         pass
+    else:
+        raise AssertionError("expected LayoutNotImplemented")
+
+
+def test_layout_planner_defaults_to_grid() -> None:
+    design = load_golden("rc_divider.json")
+    skeleton = schematic_design_to_board_skeleton(design)
+    board = LayoutPlanner().run(design, skeleton)
+    assert isinstance(LayoutPlanner().backend, GridLayoutBackend)
+    assert all(fp.placement.placed for fp in board.footprints)
+    assert board.tracks
+    assert board.attributes.get("layout_backend") == "grid_mvp"
+
+
+def test_grid_layout_job_emits_temp_pcb(tmp_path: Path) -> None:
+    design = load_golden("rc_divider.json")
+    result = run_layout_job(design, tmp_path, register_proposal=False)
+    assert result.pcb_path.is_file()
+    assert result.pcb_path.read_text(encoding="utf-8").startswith("(kicad_pcb")
+    assert result.metadata["placed"] == len(design.components)
+    assert result.metadata["production_mutation"] is False
+    assert result.summary()["human_approval_required"] is True
+    loaded = ingest_pcb(result.pcb_path)
+    assert {fp.reference for fp in loaded.footprints} == {
+        c.reference for c in design.components
+    }
+
+
+def test_load_design_from_source_json() -> None:
+    src = Path(__file__).resolve().parent / "fixtures" / "golden" / "rc_divider.json"
+    design = load_design_from_source(src)
+    assert design.id
+    assert design.components
 
 
 def test_schematic_to_board_skeleton_and_pcb_roundtrip(tmp_path: Path) -> None:

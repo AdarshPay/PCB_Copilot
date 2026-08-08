@@ -1,16 +1,17 @@
-"""CI hardware check: ingest + RULE_PACK_V0 (+ optional offline ERC fixture).
+"""CI hardware check: ingest + RULE_PACK_V0 (+ optional offline ERC/DRC fixtures).
 
 Exit-code policy
 ----------------
 * ``0`` — ingest succeeded; RULE_PACK has no blocking findings (``error`` /
-  ``critical``); offline ERC path (if enabled) parsed successfully.
-* ``1`` — sample project unexpectedly has blocking RULE_PACK findings, or the
-  offline ERC fixture could not be parsed / runner raised.
+  ``critical``); offline ERC/DRC paths (if enabled) parsed successfully.
+* ``1`` — sample project unexpectedly has blocking RULE_PACK findings, or an
+  offline ERC/DRC fixture could not be parsed / runner raised.
 * ``2`` — hard failure (missing inputs, ingest/parse exception, I/O error).
 
-Offline ERC findings from ``rc_divider_erc.json`` are **not** treated as CI
-failures: that fixture is intentionally dirty for parser smoke tests. RULE_PACK
-on the clean sample schematic is the blocking oracle.
+Offline ERC/DRC findings from the intentional dirty fixtures are **not**
+treated as CI failures: those fixtures smoke-test the parsers. RULE_PACK on the
+clean sample schematic is the blocking oracle. Live ``kicad-cli pcb drc`` remains
+optional via ``run_board_drc`` when KiCad/Docker is available.
 """
 
 from __future__ import annotations
@@ -46,6 +47,17 @@ def _default_schematic() -> Path:
 
 def _default_erc_report() -> Path:
     return _repo_root() / "tests" / "fixtures" / "kicad" / "rc_divider_erc.json"
+
+
+def _default_drc_report() -> Path:
+    return (
+        _repo_root()
+        / "tests"
+        / "fixtures"
+        / "kicad"
+        / "boards"
+        / "rc_divider_drc.json"
+    )
 
 
 def _finding_dump(finding: Finding) -> dict[str, Any]:
@@ -84,11 +96,17 @@ def run_ci_hardware_check(
     schematic: Path,
     *,
     erc_report: Path | None = None,
+    drc_report: Path | None = None,
     design_id: str | None = None,
 ) -> CiCheckResult:
-    """Ingest schematic, run rules, optionally parse offline ERC."""
+    """Ingest schematic, run rules, optionally parse offline ERC/DRC fixtures."""
     from pcb_ai_kicad_adapter.normalize import ingest_schematic
-    from pcb_ai_verification import build_review_report, run_rules, run_schematic_erc
+    from pcb_ai_verification import (
+        build_review_report,
+        run_board_drc,
+        run_rules,
+        run_schematic_erc,
+    )
 
     created_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     manifest: dict[str, Any] = {
@@ -97,6 +115,7 @@ def run_ci_hardware_check(
         "created_at": created_at,
         "schematic": str(schematic),
         "erc_report": str(erc_report) if erc_report else None,
+        "drc_report": str(drc_report) if drc_report else None,
         "rule_pack": "v0",
         "tool_versions": _tool_versions(),
         "exit_policy": {
@@ -106,11 +125,16 @@ def run_ci_hardware_check(
                 "informational only when using the intentional ERC fixture; "
                 "fail only if offline ERC parse/runner errors"
             ),
+            "drc_findings": (
+                "informational only when using the intentional DRC fixture; "
+                "fail only if offline DRC parse/runner errors"
+            ),
         },
         "ok": False,
         "design_id": None,
         "rule_findings": [],
         "erc_findings": [],
+        "drc_findings": [],
         "review_summary": {},
         "summary": {},
         "errors": [],
@@ -124,6 +148,11 @@ def run_ci_hardware_check(
     if erc_report is not None and not erc_report.is_file():
         manifest["errors"].append(f"erc report not found: {erc_report}")
         manifest["summary"] = {"ok": False, "reason": "missing_erc_report"}
+        return CiCheckResult(manifest, EXIT_HARD_FAILURE)
+
+    if drc_report is not None and not drc_report.is_file():
+        manifest["errors"].append(f"drc report not found: {drc_report}")
+        manifest["summary"] = {"ok": False, "reason": "missing_drc_report"}
         return CiCheckResult(manifest, EXIT_HARD_FAILURE)
 
     try:
@@ -169,7 +198,32 @@ def run_ci_hardware_check(
 
     manifest["erc_findings"] = [_finding_dump(f) for f in erc_findings]
 
-    combined = list(rule_findings) + erc_findings
+    drc_findings: list[Finding] = []
+    drc_mode: str | None = None
+    if drc_report is not None:
+        try:
+            drc_result = run_board_drc(report_path=drc_report)
+            drc_findings = list(drc_result.findings)
+            drc_mode = drc_result.mode
+        except Exception as exc:
+            manifest["errors"].append(f"offline DRC failed: {exc}")
+            manifest["summary"] = {
+                "ok": False,
+                "reason": "drc_error",
+                "rule_finding_count": len(rule_findings),
+                "rule_blocking_count": len(blocking),
+                "erc_finding_count": len(erc_findings),
+            }
+            return CiCheckResult(
+                manifest,
+                EXIT_CHECK_FAILED,
+                design=design,
+                combined_findings=list(rule_findings) + erc_findings,
+            )
+
+    manifest["drc_findings"] = [_finding_dump(f) for f in drc_findings]
+
+    combined = list(rule_findings) + erc_findings + drc_findings
     report = build_review_report(
         design,
         findings=combined,
@@ -177,6 +231,8 @@ def run_ci_hardware_check(
             "kind": "ci_hardware_check",
             "erc_mode": erc_mode,
             "erc_report": str(erc_report) if erc_report else None,
+            "drc_mode": drc_mode,
+            "drc_report": str(drc_report) if drc_report else None,
         },
     )
     manifest["review_summary"] = report.summary
@@ -190,6 +246,8 @@ def run_ci_hardware_check(
         "rule_blocking_count": len(blocking),
         "erc_finding_count": len(erc_findings),
         "erc_mode": erc_mode,
+        "drc_finding_count": len(drc_findings),
+        "drc_mode": drc_mode,
         "combined_finding_count": len(combined),
     }
 
@@ -202,7 +260,7 @@ def main(argv: list[str] | None = None) -> int:
         prog="pcb-ai-ci-check",
         description=(
             "CI hardware check: ingest a sample KiCad schematic, run RULE_PACK_V0, "
-            "and optionally parse an offline ERC fixture (no Docker KiCad)."
+            "and optionally parse offline ERC/DRC fixtures (no Docker KiCad)."
         ),
     )
     parser.add_argument(
@@ -224,6 +282,21 @@ def main(argv: list[str] | None = None) -> int:
         "--no-erc",
         action="store_true",
         help="Skip offline ERC fixture path",
+    )
+    parser.add_argument(
+        "--drc-report",
+        type=Path,
+        default=None,
+        help=(
+            "Offline DRC JSON path "
+            "(default: tests/fixtures/kicad/boards/rc_divider_drc.json; "
+            "use --no-drc to skip)"
+        ),
+    )
+    parser.add_argument(
+        "--no-drc",
+        action="store_true",
+        help="Skip offline DRC fixture path",
     )
     parser.add_argument(
         "--design-id",
@@ -250,11 +323,16 @@ def main(argv: list[str] | None = None) -> int:
         erc_report: Path | None = None
     else:
         erc_report = args.erc_report or _default_erc_report()
+    if args.no_drc:
+        drc_report: Path | None = None
+    else:
+        drc_report = args.drc_report or _default_drc_report()
 
     try:
         result = run_ci_hardware_check(
             schematic,
             erc_report=erc_report,
+            drc_report=drc_report,
             design_id=args.design_id,
         )
     except Exception as exc:

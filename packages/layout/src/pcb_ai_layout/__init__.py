@@ -7,7 +7,7 @@ from pcb_ai_layout.backend import (
     NullLayoutBackend,
 )
 from pcb_ai_layout.grid_backend import GridLayoutBackend
-from pcb_ai_layout.service import LayoutJobResult, run_layout_job
+from pcb_ai_layout.service import LayoutJobResult, load_design_from_source, run_layout_job
 
 __version__ = "0.1.0"
 
@@ -18,6 +18,7 @@ __all__ = [
     "LayoutNotImplemented",
     "LayoutPlanner",
     "NullLayoutBackend",
+    "load_design_from_source",
     "run_layout_job",
     "__version__",
 ]

@@ -1,9 +1,11 @@
 """Compile layout onto a temporary KiCad board branch (Phase B).
 
-Requires ``pcb-ai-layout`` installed. Not re-exported from the package root yet
-so Phase A installs stay lightweight. Import as::
+Import from the package root::
 
-    from pcb_ai_transactions.temp_board import compile_temp_board_branch
+    from pcb_ai_transactions import compile_temp_board_branch
+
+Requires ``pcb-ai-layout`` (and ``pcb-ai-pcb-ir``) installed. Never writes
+production CAD; refuse overwrite of ``source_pcb``.
 """
 
 from __future__ import annotations
@@ -54,6 +56,9 @@ def compile_temp_board_branch(
     operations: list[Operation] | None = None,
     pcb_name: str = "board.kicad_pcb",
     source_pcb: Path | str | None = None,
+    register_proposal: bool = True,
+    telemetry: Any | None = None,
+    proposal_id: str | None = None,
 ) -> TempBoardBranchResult:
     """Layout ``design`` into a temp ``.kicad_pcb`` under ``dest_dir``.
 
@@ -72,10 +77,17 @@ def compile_temp_board_branch(
                 "Refusing to write temp board branch onto the production PCB path"
             )
 
-    result = run_layout_job(design, out_dir, pcb_name=pcb_name, register_proposal=True)
+    result = run_layout_job(
+        design,
+        out_dir,
+        pcb_name=pcb_name,
+        register_proposal=register_proposal,
+        telemetry=telemetry,
+        proposal_id=proposal_id,
+    )
     if operations:
         result.board.operations.extend(operations)
-    write_pcb(result.board, dest)
+        write_pcb(result.board, dest)
 
     empty = Board(id="empty")
     diff = board_semantic_diff(empty, result.board)

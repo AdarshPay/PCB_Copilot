@@ -10,16 +10,16 @@ Phase B detail: `docs/phase-b.md`
 
 **Product north star:** coding-agent workflow for hardware — intent → tools → checks → approvable CAD diff (schematic now; board layout next; prompt-to-CAD later).
 
-**Where we stopped:** Phase A is effectively complete. Phase B (AI layout) foundation was started then **paused** so a new agent can resume cleanly. Do **not** jump to Phase C prompt-to-CAD until Phase B’s KiCad-open place/route loop works.
+**Where we stopped:** Phase A complete. Phase B B0–B5 done (layout API/CLI, offline DRC CI, temp board branch, KiCad action plugin). Next: layout benchmarks + Phase B gate. Do **not** jump to Phase C until that gate is met.
 
-**Your next job:** Resume Phase B from `docs/phase-b.md` — productize place/route, wire `/v1/layout`, temp board branch, KiCad action plugin, then layout benchmarks.
+**Your next job:** Resume Phase B checklist item **B6** from `docs/phase-b.md` — layout benchmarks + Phase B gate. Plugin try steps: `apps/kicad-plugin/README.md`.
 
 ## Product phases
 
 | Phase | Goal | Status |
 |-------|------|--------|
 | **A — Verification** | Ingest sch → Circuit IR → rules/ERC → report → typed remediations → temp `.kicad_sch` + approve telemetry | **Done** (gates met) |
-| **B — AI layout** | Board IR → place/route → temp `.kicad_pcb` → DRC → KiCad plugin approve/reload | **Foundation only** (paused) |
+| **B — AI layout** | Board IR → place/route → temp `.kicad_pcb` → DRC → KiCad plugin approve/reload | **In progress** (B0–B5 done; benchmarks / gate remain) |
 | **C — Prompt-to-CAD** | NL → schematic + first-pass layout via same verify loop | Not started |
 
 ## Sprint status (Phase A)
@@ -36,7 +36,7 @@ Phase B detail: `docs/phase-b.md`
 | Evidence | Foundation | Seed catalog + `attach_evidence` |
 | Remediations / temp sch branch | Done | Planner default **off**; no production CAD writes |
 | Approval telemetry | Done | `/v1/proposals/{id}/decision`, `/v1/decisions` |
-| Phase B foundation | Started (paused) | See below |
+| Phase B foundation | In progress | B0–B5 done; B6 layout benchmarks / gate remain |
 
 ## Phase B — paused state (resume here)
 
@@ -46,10 +46,10 @@ Full plan: Cursor plan **Phase B AI Layout** + `docs/phase-b.md` + plan §11 Day
 |------------|--------|----------|
 | B0 Board IR + layout skeleton | **Done** | `packages/pcb-ir`, `packages/layout` |
 | B1 PCB ingest/emit + sch→board skeleton | **Done** | `pcb.py`, `board_bridge.py` |
-| B2 DRC parse/runner | **Partial** | `drc_parse.py`, `drc_runner.py`; fixture `tests/fixtures/kicad/boards/rc_divider_drc.json` |
-| B3 Grid place/route | **WIP** | `GridLayoutBackend` exists; not productized / no `/v1/layout` yet |
-| B4 Temp board branch | **Stub** | `temp_board.py` — import explicitly; not in package `__init__` |
-| B5 KiCad action plugin | **Not started** | `apps/kicad-plugin/` is README stub only |
+| B2 DRC parse/runner | **Done (offline CI)** | `drc_*.py` + fixture in `ci_check`; live `kicad-cli` optional via runner/worker |
+| B3 Grid place/route | **Done (API/CLI)** | `GridLayoutBackend` default; CLI + `POST /v1/layout` (+ `/from-design`) |
+| B4 Temp board branch | **Done** | Lazy re-export; `POST /v1/temp-board` (+ `/from-design`); overwrite guard; decision telemetry |
+| B5 KiCad action plugin | **Done** | `apps/kicad-plugin/pcb_copilot_layout/` + `scripts/install_kicad_plugin.ps1` |
 | B6 Layout benchmarks + E2E demo | **Not started** | — |
 
 ### Phase B MVP outcome (when finished)
@@ -58,10 +58,10 @@ With KiCad open on a small 2-layer project: plugin → API layouts board into te
 
 ### Resume checklist (ordered)
 
-1. Productize `GridLayoutBackend` + `python -m pcb_ai_layout layout …` + `POST /v1/layout`
-2. Wire offline DRC into CI; optional live `kicad-cli pcb drc`
-3. Re-export `compile_temp_board_branch`; hook layout proposals into decision telemetry
-4. KiCad 10 action plugin → local API → approve/reload
+1. ~~Productize `GridLayoutBackend` + CLI + `POST /v1/layout`~~ **Done**
+2. ~~Wire offline DRC into CI; optional live `kicad-cli pcb drc`~~ **Done**
+3. ~~Re-export `compile_temp_board_branch`; hook layout proposals into decision telemetry~~ **Done**
+4. ~~KiCad 10 action plugin → local API → approve/reload~~ **Done**
 5. Layout benchmarks + Phase B gate checklist in this handoff before Phase C
 
 ## Architecture (current)
@@ -81,8 +81,11 @@ With KiCad open on a small 2-layer project: plugin → API layouts board into te
 
 Phase B (partial):
   Circuit IR → schematic_design_to_board_skeleton → Board IR
-            → GridLayoutBackend (WIP) → write_pcb → .kicad_pcb
-            → parse_drc_report / run_board_drc (offline OK)
+            → GridLayoutBackend → write_pcb → .kicad_pcb
+            → POST /v1/layout | python -m pcb_ai_layout layout
+            → compile_temp_board_branch / POST /v1/temp-board (+ decision telemetry)
+            → parse_drc_report / run_board_drc (offline OK; live kicad-cli optional)
+            → KiCad Action Plugin → POST /v1/layout → approve → *-copilot.kicad_pcb sidecar
 ```
 
 ## Non-negotiables
@@ -97,20 +100,20 @@ Phase B (partial):
 ## Repo map
 
 ```text
-apps/api/                 /health, /v1/reviews, /ingest, /proposals, /temp-branch, /decisions
+apps/api/                 /health, /v1/reviews, /ingest, /proposals, /temp-branch, /temp-board, /layout, /decisions
 apps/web/                 Stub
-apps/kicad-plugin/        Stub README only — Phase B plugin goes here
+apps/kicad-plugin/        KiCad 10 Action Plugin (layout → sidecar *-copilot.kicad_pcb)
 packages/circuit-ir/      Design, Component, Pin, Net, Finding, Operation, ReviewReport
 packages/pcb-ir/          Board, FootprintInstance, Track, Via, Outline, … (Phase B)
 packages/kicad-adapter/   sch + pcb ingest/emit, hierarchy, board_bridge
 packages/verification/    RULE_PACK_V0, ERC, DRC parse/runner, reports
-packages/layout/          LayoutPlanner, NullLayoutBackend, GridLayoutBackend WIP, run_layout_job
-packages/transactions/    apply_operations, compile_temp_branch; temp_board.py (explicit import)
+packages/layout/          LayoutPlanner→GridLayoutBackend, run_layout_job, CLI
+packages/transactions/    apply_operations, compile_temp_branch; compile_temp_board_branch (lazy re-export)
 packages/agent/           remediations, Planner(default off), DecisionTelemetry
 packages/component-library/  30 profiles + registry
 packages/evidence/        EvidenceService + seed catalog
 packages/benchmarks/      first-pack + ci_check
-services/worker/          verify_design, run_erc (run_drc not wired yet)
+services/worker/          verify_design, run_erc, run_drc
 infra/docker/kicad-cli/   KiCad 10 CLI image
 tests/fixtures/golden/    10 clean IR + output_conflict
 tests/fixtures/kicad/     sch fixtures + boards/ DRC JSON
@@ -131,7 +134,8 @@ tests/fixtures/kicad/     sch fixtures + boards/ DRC JSON
 - `packages/kicad-adapter/pcb.py` — `ingest_pcb` / `write_pcb` / emit AST
 - `packages/kicad-adapter/board_bridge.py` — `schematic_design_to_board_skeleton`
 - `packages/verification/drc_*.py` — offline DRC JSON → Finding (`source=kicad_drc`)
-- `packages/transactions/temp_board.py` — `compile_temp_board_branch` (needs layout installed)
+- `packages/transactions/temp_board.py` — `compile_temp_board_branch` (lazy package re-export; needs layout)
+- `apps/api/.../routes/temp_board.py` — `POST /v1/temp-board` (+ `/from-design`); telemetry via `get_decision_telemetry`
 - `tests/test_pcb_ir_foundation.py` — foundation smoke tests
 - `scripts/install_dev.ps1` — installs `pcb-ir` then `layout`
 
@@ -165,15 +169,15 @@ Notes:
 
 ## Tests
 
-Expect **~235 passed** (`pytest`) including `test_pcb_ir_foundation.py`.  
+Expect **~240 passed** (`pytest`) including layout API/foundation tests.  
 Benchmark: **111** first-pack cases.  
-`ci_check` exit **0** with offline ERC fixture.
+`ci_check` exit **0** with offline ERC + DRC fixtures.
 
 ## Remaining gaps (known)
 
 **Phase A residuals (non-blocking):** lossless multi-file sch emit; deeper bus aliases; deep datasheet RAG.
 
-**Phase B remaining:** productize layout API/CLI; CI DRC; temp board branch UX; **KiCad plugin**; benchmarks; KiCad-open E2E demo.
+**Phase B remaining:** layout benchmarks + Phase B gate / KiCad-open E2E checklist (B6). Plugin MVP is ready to try (`apps/kicad-plugin/README.md`).
 
 **Not built:** React review UI; production LLM planner; ngspice; Altium; Phase C.
 
@@ -194,9 +198,11 @@ Benchmark: **111** first-pack cases.
 | Circuit IR | `packages/circuit-ir/src/pcb_ai_circuit_ir/models.py` |
 | Board IR | `packages/pcb-ir/src/pcb_ai_pcb_ir/models.py` |
 | Layout WIP | `packages/layout/src/pcb_ai_layout/grid_backend.py`, `service.py` |
+| Layout API | `apps/api/src/pcb_ai_api/routes/layout.py` |
 | PCB I/O | `packages/kicad-adapter/src/pcb_ai_kicad_adapter/pcb.py`, `board_bridge.py` |
 | Rules / ERC / DRC | `packages/verification/src/pcb_ai_verification/` |
 | Temp sch branch | `packages/transactions/src/pcb_ai_transactions/temp_branch.py` |
-| Temp board stub | `packages/transactions/src/pcb_ai_transactions/temp_board.py` |
-| Plugin stub | `apps/kicad-plugin/README.md` |
+| Temp board branch | `packages/transactions/src/pcb_ai_transactions/temp_board.py` |
+| Temp board API | `apps/api/src/pcb_ai_api/routes/temp_board.py` |
+| KiCad plugin | `apps/kicad-plugin/README.md`, `scripts/install_kicad_plugin.ps1` |
 | API | `apps/api/src/pcb_ai_api/` |
